@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 
 const items = [
   { href: "/", label: "Dashboard" },
@@ -19,6 +22,13 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
+      <button
+        type="button"
+        onClick={() => signOut({ callbackUrl: "/login" })}
+        className="mt-6 w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted"
+      >
+        Sair
+      </button>
     </aside>
   );
 }

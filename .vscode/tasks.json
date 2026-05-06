@@ -3,8 +3,8 @@
   "tasks": [
     {
       "label": "Start Next.js Dev Server",
-      "type": "npm",
-      "script": "dev",
+      "type": "shell",
+      "command": "npm.cmd run dev",
       "isBackground": true,
       "problemMatcher": {
         "owner": "custom",

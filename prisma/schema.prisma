@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum StatusEmprestimo {
+  ativo
+  quitado
+  inadimplente
+}
+
+enum StatusParcela {
+  pendente
+  paga
+  vencida
+}
+
+enum MetodoPagamento {
+  pix
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Cliente {
+  id                  String       @id @default(cuid())
+  nome                String
+  cpf                 String       @unique
+  endereco            String
+  whatsapp            String
+  referencia1_nome    String?
+  referencia1_telefone String?
+  referencia2_nome    String?
+  referencia2_telefone String?
+  created_at          DateTime     @default(now())
+  emprestimos         Emprestimo[]
+}
+
+model Emprestimo {
+  id                    String           @id @default(cuid())
+  cliente_id            String
+  valor_emprestado      Decimal          @db.Decimal(12, 2)
+  taxa_juros_percentual Decimal          @db.Decimal(5, 2)
+  numero_parcelas       Int
+  valor_parcela         Decimal          @db.Decimal(12, 2)
+  data_inicio           DateTime
+  vencimento_dia        Int
+  multa_percentual      Decimal          @default(2) @db.Decimal(5, 2)
+  juros_dia_percentual  Decimal          @default(0.33) @db.Decimal(5, 2)
+  status                StatusEmprestimo @default(ativo)
+  created_at            DateTime         @default(now())
+  cliente               Cliente          @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
+  parcelas              Parcela[]
+}
+
+model Parcela {
+  id              String        @id @default(cuid())
+  emprestimo_id   String
+  numero_parcela  Int
+  valor_original  Decimal       @db.Decimal(12, 2)
+  vencimento      DateTime
+  data_pagamento  DateTime?
+  dias_atraso     Int           @default(0)
+  multa_valor     Decimal       @default(0) @db.Decimal(12, 2)
+  juros_valor     Decimal       @default(0) @db.Decimal(12, 2)
+  valor_atualizado Decimal      @default(0) @db.Decimal(12, 2)
+  status          StatusParcela @default(pendente)
+  emprestimo      Emprestimo    @relation(fields: [emprestimo_id], references: [id], onDelete: Cascade)
+  pagamentos      Pagamento[]
+
+  @@unique([emprestimo_id, numero_parcela])
+}
+
+model Pagamento {
+  id             String          @id @default(cuid())
+  parcela_id     String
+  valor_pago     Decimal         @db.Decimal(12, 2)
+  metodo         MetodoPagamento @default(pix)
+  transaction_id String          @unique
+  data_pagamento DateTime        @default(now())
+  status         String
+  parcela        Parcela         @relation(fields: [parcela_id], references: [id], onDelete: Restrict)
+}

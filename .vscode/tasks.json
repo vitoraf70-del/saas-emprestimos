@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Next.js Dev Server",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^(.*)$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "ready - started server on|Ready in|Starting..."
+        }
+      }
+    },
+    {
+      "label": "Open App in Browser",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"Start-Sleep -Seconds 4; Start-Process 'http://localhost:3000'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Startup: Dev + Browser",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Start Next.js Dev Server",
+        "Open App in Browser"
+      ],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

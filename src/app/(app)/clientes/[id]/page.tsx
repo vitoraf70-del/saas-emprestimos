@@ -7,7 +7,7 @@ import { EditarClienteModal } from "@/components/clientes/editar-cliente-modal";
 import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-button";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { formatDateBR } from "@/lib/date";
-import { buildPagarLink, buildPagarLinkWithCpf } from "@/lib/app-url";
+import { buildPagarLink, buildPagarLinkWithCpf, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -63,7 +63,7 @@ export default async function ClienteDetalhePage({
         phone: clienteAtual.whatsapp,
         message: `Olá ${clienteAtual.nome}, sua parcela está em aberto. Valor atualizado: ${toCurrency(
           Number(atualizada.valor_atualizado)
-        )}. Acesse o link, digite seu CPF e pague pelo PIX: ${link}`
+        )}.${formatLinkPagamentoWhatsApp(link)}`
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao enviar WhatsApp.";

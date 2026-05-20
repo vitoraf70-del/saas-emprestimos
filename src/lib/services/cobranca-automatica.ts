@@ -4,7 +4,7 @@ import { calcularParcelaAtualizada, diasAtraso, diasParaVencer, isSameCalendarDa
 import { isDomingo } from "@/lib/parcel-schedule";
 import { formatDateBR } from "@/lib/date";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
-import { buildPagarLink } from "@/lib/app-url";
+import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 
 const MAX_AVISOS_ANTECIPADOS = 2;
@@ -75,17 +75,17 @@ function montarMensagem(input: {
   const { nome, numeroParcela, vencimento, valorAtualizado, linkPagamento, fase } = input;
   const valor = toCurrency(valorAtualizado);
   const dataVenc = formatDateBR(vencimento);
-  const rodape = `Acesse o link, digite seu CPF e pague pelo PIX: ${linkPagamento}`;
+  const rodape = formatLinkPagamentoWhatsApp(linkPagamento);
 
   if (fase === "antecipado") {
-    return `Olá ${nome}! Lembrete ${input.avisoNumero}/${input.maxAvisos}: sua parcela ${numeroParcela} vence em 2 dias (${dataVenc}). Valor: ${valor}. ${rodape}`;
+    return `Olá ${nome}! Lembrete ${input.avisoNumero}/${input.maxAvisos}: sua parcela ${numeroParcela} vence em 2 dias (${dataVenc}). Valor: ${valor}.${rodape}`;
   }
 
   if (fase === "vencimento") {
-    return `Olá ${nome}! Aviso ${input.avisoNumero}/${input.maxAvisos}: sua parcela ${numeroParcela} vence HOJE (${dataVenc}). Valor: ${valor}. ${rodape}`;
+    return `Olá ${nome}! Aviso ${input.avisoNumero}/${input.maxAvisos}: sua parcela ${numeroParcela} vence HOJE (${dataVenc}). Valor: ${valor}.${rodape}`;
   }
 
-  return `Olá ${nome}! Sua parcela ${numeroParcela} está em atraso há ${input.diasAtrasoValor} dia(s) (venc. ${dataVenc}). Valor atualizado com multa e juros: ${valor}. ${rodape}`;
+  return `Olá ${nome}! Sua parcela ${numeroParcela} está em atraso há ${input.diasAtrasoValor} dia(s) (venc. ${dataVenc}). Valor atualizado com multa e juros: ${valor}.${rodape}`;
 }
 
 export async function processarCobrancaAutomatica(): Promise<CobrancaAutomaticaResult> {

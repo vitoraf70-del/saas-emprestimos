@@ -16,8 +16,13 @@ function detectLanHost() {
  * URL pública usada em links de WhatsApp e cobrança.
  * Em dev, se o .env estiver com localhost, usa o IP da rede (celular na mesma Wi‑Fi).
  */
+/** Remove espaços/quebras que quebram o link no WhatsApp (ex.: URL colada na Vercel com Enter). */
+export function sanitizePublicUrl(url: string) {
+  return url.replace(/\s+/g, "").trim().replace(/\/$/, "");
+}
+
 export function getPublicAppUrl() {
-  const raw = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const raw = sanitizePublicUrl(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
   const isLocalhost = /localhost|127\.0\.0\.1/i.test(raw);
 
   if (isLocalhost && process.env.NODE_ENV !== "production") {
@@ -39,4 +44,14 @@ export function buildPagarLink() {
 /** Link com CPF na URL — uso interno / atalho no painel. */
 export function buildPagarLinkWithCpf(cpf: string) {
   return `${getPublicAppUrl()}/pagar?cpf=${encodeURIComponent(cpf)}`;
+}
+
+/** Link em linha isolada — WhatsApp reconhece a URL inteira (com /pagar). */
+export function formatLinkPagamentoWhatsApp(link: string) {
+  const url = sanitizePublicUrl(link);
+  return `
+
+${url}
+
+Abra o link acima, digite seu CPF e pague pelo PIX.`;
 }

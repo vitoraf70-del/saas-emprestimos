@@ -21,8 +21,8 @@ export type CobrancaAutomaticaResult = {
 
 type FaseCobranca = "antecipado" | "vencimento" | "atraso" | null;
 
-function buildPaymentLink(cpf: string) {
-  return buildPagarLink(cpf);
+function buildPaymentLink() {
+  return buildPagarLink();
 }
 
 function detectarFase(
@@ -75,7 +75,7 @@ function montarMensagem(input: {
   const { nome, numeroParcela, vencimento, valorAtualizado, linkPagamento, fase } = input;
   const valor = toCurrency(valorAtualizado);
   const dataVenc = formatDateBR(vencimento);
-  const rodape = `Pague pelo PIX no link (digite seu CPF na página): ${linkPagamento}`;
+  const rodape = `Acesse o link, digite seu CPF e pague pelo PIX: ${linkPagamento}`;
 
   if (fase === "antecipado") {
     return `Olá ${nome}! Lembrete ${input.avisoNumero}/${input.maxAvisos}: sua parcela ${numeroParcela} vence em 2 dias (${dataVenc}). Valor: ${valor}. ${rodape}`;
@@ -138,7 +138,7 @@ export async function processarCobrancaAutomatica(): Promise<CobrancaAutomaticaR
     }
 
     const cliente = parcela.emprestimo.cliente;
-    const linkPagamento = buildPaymentLink(cliente.cpf);
+    const linkPagamento = buildPaymentLink();
 
     let avisoNumero = 1;
     let maxAvisos = 1;

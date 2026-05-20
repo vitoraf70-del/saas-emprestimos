@@ -7,7 +7,7 @@ import { EditarClienteModal } from "@/components/clientes/editar-cliente-modal";
 import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-button";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { formatDateBR } from "@/lib/date";
-import { buildPagarLink } from "@/lib/app-url";
+import { buildPagarLink, buildPagarLinkWithCpf } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -58,12 +58,12 @@ export default async function ClienteDetalhePage({
       }
 
       const atualizada = await recalculateParcela(atrasadas[0].id);
-      const link = buildPagarLink(clienteAtual.cpf);
+      const link = buildPagarLink();
       await sendWhatsAppMessage({
         phone: clienteAtual.whatsapp,
         message: `Olá ${clienteAtual.nome}, sua parcela está em aberto. Valor atualizado: ${toCurrency(
           Number(atualizada.valor_atualizado)
-        )}. Pague pelo PIX: ${link}`
+        )}. Acesse o link, digite seu CPF e pague pelo PIX: ${link}`
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao enviar WhatsApp.";
@@ -112,7 +112,7 @@ export default async function ClienteDetalhePage({
           <Button type="submit">Cobrar no WhatsApp</Button>
         </form>
         <Button asChild variant="outline">
-          <Link href={`/pagar?cpf=${encodeURIComponent(cliente.cpf)}`} target="_blank">
+          <Link href={buildPagarLinkWithCpf(cliente.cpf)} target="_blank">
             Abrir página de pagamento
           </Link>
         </Button>

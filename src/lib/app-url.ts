@@ -31,6 +31,12 @@ export function getPublicAppUrl() {
   return raw;
 }
 
-export function buildPagarLink(cpf: string) {
+/** Link público de pagamento (cliente informa o CPF na página). */
+export function buildPagarLink() {
+  return `${getPublicAppUrl()}/pagar`;
+}
+
+/** Link com CPF na URL — uso interno / atalho no painel. */
+export function buildPagarLinkWithCpf(cpf: string) {
   return `${getPublicAppUrl()}/pagar?cpf=${encodeURIComponent(cpf)}`;
 }

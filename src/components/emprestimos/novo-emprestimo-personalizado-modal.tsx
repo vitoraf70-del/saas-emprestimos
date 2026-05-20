@@ -2,11 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { JUROS_DIA_FIXO, MULTA_ATRASO_FIXA } from "@/lib/finance";
+import { buildInstallmentDueDates } from "@/lib/parcel-schedule";
 import { toCurrency } from "@/lib/utils";
 
 type ClienteOption = {
@@ -32,14 +33,13 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
   const totalAReceber = valorParcelaNum * numeroParcelas;
   const lucroPrevisto = totalAReceber - valorEmprestadoNum;
-  const stepDays = frequencia === "diario" ? 1 : 7;
 
   const parcelasCalculadas = useMemo(() => {
     if (!primeiroVencimento) return [];
     const dataBase = new Date(`${primeiroVencimento}T12:00:00`);
     if (Number.isNaN(dataBase.getTime())) return [];
-    return Array.from({ length: numeroParcelas }, (_, index) => addDays(dataBase, index * stepDays));
-  }, [numeroParcelas, primeiroVencimento, stepDays]);
+    return buildInstallmentDueDates(dataBase, numeroParcelas, frequencia);
+  }, [numeroParcelas, primeiroVencimento, frequencia]);
 
   const parcelasCalculadasISO = parcelasCalculadas.map((data) => format(data, "yyyy-MM-dd"));
   const parcelasResumo = parcelasCalculadas.map((data) => format(data, "dd/MM (EEE)", { locale: ptBR }));
@@ -157,7 +157,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
               onChange={(e) => setFrequencia(e.target.value as Frequencia)}
             >
               <option value="semanal">Semanal (a cada 7 dias)</option>
-              <option value="diario">Diário (a cada 1 dia)</option>
+              <option value="diario">Diário (segunda a sábado, sem domingo)</option>
             </select>
 
             <input
@@ -184,8 +184,9 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
             </p>
 
             <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-              Em atraso: multa fixa de {toCurrency(MULTA_ATRASO_FIXA)} + {toCurrency(JUROS_DIA_FIXO)} por dia de atraso
-              (aplicado automaticamente na cobrança e no PIX).
+              Vencimento diário: segunda a sábado (domingo não entra na grade de cobrança).
+              Em atraso, multa de {toCurrency(MULTA_ATRASO_FIXA)} + {toCurrency(JUROS_DIA_FIXO)} por dia
+              corre inclusive aos domingos.
             </p>
 
             {error ? <p className="text-sm text-red-600">{error}</p> : null}

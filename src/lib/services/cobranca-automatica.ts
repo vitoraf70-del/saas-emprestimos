@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { calcularParcelaAtualizada, diasAtraso, diasParaVencer, isSameCalendarDayBR } from "@/lib/finance";
+import { isDomingo } from "@/lib/parcel-schedule";
 import { formatDateBR } from "@/lib/date";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { buildPagarLink } from "@/lib/app-url";
@@ -37,6 +38,10 @@ function detectarFase(
       return { fase: null, motivo: "atraso: já avisado hoje" };
     }
     return { fase: "atraso" };
+  }
+
+  if (isDomingo(hoje)) {
+    return { fase: null, motivo: "domingo: cobrança só em atraso (multa/juros continuam)" };
   }
 
   if (diasParaVencerValor === DIAS_ANTECEDENCIA) {

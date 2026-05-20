@@ -3,7 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 const { hash } = require("bcryptjs");
 
 const prisma = new PrismaClient();
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Agiota70Afonso@67";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Agiota70Afonso67";
 
 async function main() {
   const passwordHash = await hash(ADMIN_PASSWORD, 10);

@@ -23,14 +23,35 @@ function requireEnv(name: string) {
 
 function readPemFromEnvOrPath(envName: string, pathName: string) {
   const raw = process.env[envName]?.trim();
-  if (raw) return raw;
+  if (raw) return normalizePem(raw);
 
   const filePath = process.env[pathName]?.trim();
   if (filePath) {
-    return readFileSync(filePath, "utf8");
+    try {
+      return normalizePem(readFileSync(filePath, "utf8"));
+    } catch {
+      throw new Error(
+        `${pathName} aponta para arquivo inexistente (${filePath}). Em produção use ${envName} com o conteúdo PEM na Vercel.`
+      );
+    }
   }
 
   throw new Error(`Variável ausente: ${envName} (ou ${pathName})`);
+}
+
+function readOptionalCaPem() {
+  const inline = process.env.INTER_MTLS_CA?.trim();
+  if (inline) return normalizePem(inline);
+
+  const filePath = process.env.INTER_MTLS_CA_PATH?.trim();
+  if (!filePath) return undefined;
+
+  try {
+    return normalizePem(readFileSync(filePath, "utf8"));
+  } catch {
+    // Ex.: INTER_MTLS_CA_PATH com caminho do Windows (C:\...) na Vercel — ignora e usa CA do sistema
+    return undefined;
+  }
 }
 
 function readInterEnv(): InterEnv {
@@ -41,7 +62,7 @@ function readInterEnv(): InterEnv {
     pixKey: requireEnv("INTER_PIX_KEY"),
     certPem: readPemFromEnvOrPath("INTER_MTLS_CERT", "INTER_MTLS_CERT_PATH"),
     keyPem: readPemFromEnvOrPath("INTER_MTLS_KEY", "INTER_MTLS_KEY_PATH"),
-    caPem: process.env.INTER_MTLS_CA?.trim() || (process.env.INTER_MTLS_CA_PATH?.trim() ? readFileSync(process.env.INTER_MTLS_CA_PATH.trim(), "utf8") : undefined)
+    caPem: readOptionalCaPem()
   };
 }
 

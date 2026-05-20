@@ -10,9 +10,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    if (!body.clienteId || !body.numeroParcelas || !body.valorParcela || !body.primeiroVencimento || !body.frequencia) {
+    if (
+      !body.clienteId ||
+      !body.valorEmprestado ||
+      !body.numeroParcelas ||
+      !body.valorParcela ||
+      !body.primeiroVencimento ||
+      !body.frequencia
+    ) {
       return NextResponse.json(
-        { error: "Preencha cliente, parcelas, valor da parcela, frequência e primeiro vencimento." },
+        { error: "Preencha cliente, valor emprestado, parcelas, valor da parcela, frequência e primeiro vencimento." },
         { status: 400 }
       );
     }
@@ -22,6 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Frequência inválida. Use diario ou semanal." }, { status: 400 });
     }
 
+    const valorEmprestado = Number(body.valorEmprestado);
     const numeroParcelas = Number(body.numeroParcelas);
     const valorParcela = Number(body.valorParcela);
     const parcelasVencimentos = Array.isArray(body.parcelasVencimentos)
@@ -37,6 +45,7 @@ export async function POST(request: Request) {
 
     const emprestimo = await createEmprestimoPersonalizado({
       clienteId: String(body.clienteId),
+      valorEmprestado,
       numeroParcelas,
       valorParcela,
       frequencia,

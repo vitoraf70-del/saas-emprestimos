@@ -102,6 +102,7 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
 
 type CreateEmprestimoPersonalizadoInput = {
   clienteId: string;
+  valorEmprestado: number;
   numeroParcelas: number;
   valorParcela: number;
   frequencia: FrequenciaParcela;
@@ -117,11 +118,14 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
   if (input.numeroParcelas < 1 || input.numeroParcelas > 120) {
     throw new Error("Número de parcelas inválido (use entre 1 e 120).");
   }
+  if (input.valorEmprestado <= 0) {
+    throw new Error("Valor emprestado deve ser maior que zero.");
+  }
   if (input.valorParcela <= 0) {
     throw new Error("Valor da parcela deve ser maior que zero.");
   }
 
-  const valorEmprestado = Number((input.valorParcela * input.numeroParcelas).toFixed(2));
+  const valorEmprestado = Number(input.valorEmprestado.toFixed(2));
 
   return prisma.$transaction(async (tx) => {
     const emprestimo = await tx.emprestimo.create({

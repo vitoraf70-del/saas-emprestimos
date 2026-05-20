@@ -23,12 +23,15 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [numeroParcelas, setNumeroParcelas] = useState(4);
+  const [valorEmprestado, setValorEmprestado] = useState("500");
   const [valorParcela, setValorParcela] = useState("200");
   const [frequencia, setFrequencia] = useState<Frequencia>("semanal");
   const [primeiroVencimento, setPrimeiroVencimento] = useState("");
 
+  const valorEmprestadoNum = Number(valorEmprestado.replace(",", ".")) || 0;
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
-  const totalFinal = valorParcelaNum * numeroParcelas;
+  const totalAReceber = valorParcelaNum * numeroParcelas;
+  const lucroPrevisto = totalAReceber - valorEmprestadoNum;
   const stepDays = frequencia === "diario" ? 1 : 7;
 
   const parcelasCalculadas = useMemo(() => {
@@ -50,6 +53,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
     const data = new FormData(form);
     const payload = {
       clienteId: String(data.get("clienteId") ?? ""),
+      valorEmprestado: Number(String(data.get("valorEmprestado") ?? "").replace(",", ".")),
       numeroParcelas: Number(data.get("numeroParcelas") ?? 0),
       valorParcela: Number(String(data.get("valorParcela") ?? "").replace(",", ".")),
       frequencia: String(data.get("frequencia") ?? "semanal"),
@@ -72,6 +76,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
     }
 
     setNumeroParcelas(4);
+    setValorEmprestado("500");
     setValorParcela("200");
     setFrequencia("semanal");
     setPrimeiroVencimento("");
@@ -100,6 +105,20 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
                 </option>
               ))}
             </select>
+
+            <label className="grid gap-1 text-sm">
+              <span>Valor emprestado ao cliente (R$)</span>
+              <input
+                type="number"
+                required
+                min={0.01}
+                step={0.01}
+                name="valorEmprestado"
+                value={valorEmprestado}
+                onChange={(e) => setValorEmprestado(e.target.value)}
+                className="rounded-md border p-2"
+              />
+            </label>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
@@ -155,9 +174,13 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
             </p>
 
             <p className="rounded-md border bg-muted/40 p-2 text-sm">
+              Emprestado: <span className="font-semibold">{toCurrency(valorEmprestadoNum)}</span>
+              <br />
               {numeroParcelas}x de <span className="font-semibold">{toCurrency(valorParcelaNum)}</span> ({frequencia})
               <br />
-              Total do contrato: <span className="font-semibold">{toCurrency(totalFinal)}</span>
+              Total a receber: <span className="font-semibold">{toCurrency(totalAReceber)}</span>
+              <br />
+              Lucro previsto: <span className="font-semibold">{toCurrency(lucroPrevisto)}</span>
             </p>
 
             <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
@@ -167,7 +190,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
 
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-            <Button type="submit" disabled={loading || valorParcelaNum <= 0}>
+            <Button type="submit" disabled={loading || valorEmprestadoNum <= 0 || valorParcelaNum <= 0}>
               {loading ? "Salvando..." : "Salvar empréstimo personalizado"}
             </Button>
           </form>

@@ -13,7 +13,9 @@ export async function getDashboardData() {
   ]);
 
   const totalEmprestado = emprestimos.reduce((acc, item) => acc + toNumber(item.valor_emprestado), 0);
-  const totalRecebido = pagamentos.reduce((acc, item) => acc + toNumber(item.valor_pago), 0);
+  const totalRecebido = pagamentos
+    .filter((p) => p.status === "confirmado")
+    .reduce((acc, item) => acc + toNumber(item.valor_pago), 0);
   const totalAReceber = parcelas
     .filter((p) => p.status !== "paga")
     .reduce((acc, item) => acc + toNumber(item.valor_atualizado || item.valor_original), 0);

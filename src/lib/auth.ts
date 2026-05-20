@@ -15,19 +15,27 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Senha", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) return null;
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
-        });
-        if (!user?.passwordHash) return null;
+        const email = credentials?.email?.trim().toLowerCase();
+        const password = credentials?.password ?? "";
+        if (!email || !password) return null;
 
-        const hash = user.passwordHash;
-        const passwordOk = hash.startsWith("$2")
-          ? await compare(credentials.password, hash)
-          : credentials.password === hash;
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email }
+          });
+          if (!user?.passwordHash) return null;
 
-        if (!passwordOk) return null;
-        return { id: user.id, name: user.name, email: user.email };
+          const hash = user.passwordHash;
+          const passwordOk = hash.startsWith("$2")
+            ? await compare(password, hash)
+            : password === hash;
+
+          if (!passwordOk) return null;
+          return { id: user.id, name: user.name, email: user.email };
+        } catch (error) {
+          console.error("[auth] falha ao validar login:", error);
+          return null;
+        }
       }
     })
   ],

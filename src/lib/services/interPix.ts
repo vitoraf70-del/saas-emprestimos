@@ -114,21 +114,25 @@ async function interFetch(env: InterEnv, path: string, init: UndiciRequestInit) 
   }
 }
 
-let cachedToken: { token: string; expiresAtMs: number } | null = null;
+/** Escopos para gerar/consultar cobrança PIX (padrão da integração Inter). */
+const INTER_SCOPE_PIX_COB = "cob.read cob.write pix.read pix.write";
+/** Escopos extras só para cadastrar webhook (muitas integrações não têm — não usar no PIX). */
+const INTER_SCOPE_WEBHOOK = "webhook.read webhook.write";
 
-async function getInterAccessToken(env: InterEnv) {
+const tokenCache = new Map<string, { token: string; expiresAtMs: number }>();
+
+async function getInterAccessToken(env: InterEnv, scope: string) {
   const now = Date.now();
-  if (cachedToken && cachedToken.expiresAtMs - now > 30_000) {
-    return cachedToken.token;
+  const cached = tokenCache.get(scope);
+  if (cached && cached.expiresAtMs - now > 30_000) {
+    return cached.token;
   }
 
   const body = new URLSearchParams({
     client_id: env.clientId,
     client_secret: env.clientSecret,
     grant_type: "client_credentials",
-    scope:
-      process.env.INTER_OAUTH_SCOPE?.trim() ??
-      "cob.read cob.write pix.read pix.write webhook.read webhook.write payloadlocation.read payloadlocation.write"
+    scope
   });
 
   const { response, text } = await interFetch(env, "/oauth/v2/token", {
@@ -150,12 +154,24 @@ async function getInterAccessToken(env: InterEnv) {
   }
 
   const expiresInSec = typeof json.expires_in === "number" ? json.expires_in : 3600;
-  cachedToken = {
+  tokenCache.set(scope, {
     token: json.access_token,
     expiresAtMs: Date.now() + Math.max(60, expiresInSec - 60) * 1000
-  };
+  });
 
   return json.access_token;
+}
+
+function resolveInterOAuthScope(mode: "pix" | "webhook") {
+  const custom = process.env.INTER_OAUTH_SCOPE?.trim();
+  if (custom) return custom;
+
+  if (mode === "webhook") {
+    const webhookOnly = process.env.INTER_OAUTH_SCOPE_WEBHOOK?.trim();
+    return webhookOnly ?? `${INTER_SCOPE_PIX_COB} ${INTER_SCOPE_WEBHOOK}`;
+  }
+
+  return INTER_SCOPE_PIX_COB;
 }
 
 export async function interCreateCobrancaImediata(input: {
@@ -166,7 +182,7 @@ export async function interCreateCobrancaImediata(input: {
   devedor?: { cpf: string; nome: string };
 }) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env);
+  const token = await getInterAccessToken(env, resolveInterOAuthScope("pix"));
 
   const payload = {
     calendario: { expiracao: input.expiracaoSegundos ?? 180 },
@@ -213,7 +229,7 @@ export function getInterWebhookCallbackUrl() {
 
 export async function interPutPixWebhook(webhookUrl?: string) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env);
+  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
   const url = webhookUrl?.trim() || getInterWebhookCallbackUrl();
 
   const { response, text } = await interFetch(
@@ -239,7 +255,7 @@ export async function interPutPixWebhook(webhookUrl?: string) {
 
 export async function interGetPixWebhook() {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env);
+  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
 
   const { response, text } = await interFetch(
     env,
@@ -266,7 +282,7 @@ export async function interGetPixWebhook() {
 
 export async function interDeletePixWebhook() {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env);
+  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
 
   const { response, text } = await interFetch(
     env,
@@ -293,7 +309,7 @@ export async function interDeletePixWebhook() {
 
 export async function interGetCobrancaImediata(txid: string) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env);
+  const token = await getInterAccessToken(env, resolveInterOAuthScope("pix"));
 
   const { response, text } = await interFetch(env, `/pix/v2/cob/${encodeURIComponent(txid)}`, {
     method: "GET",

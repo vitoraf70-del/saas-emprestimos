@@ -4,8 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toCurrency } from "@/lib/utils";
 import { NovoEmprestimoModal } from "@/components/emprestimos/novo-emprestimo-modal";
 import { NovoEmprestimoPersonalizadoModal } from "@/components/emprestimos/novo-emprestimo-personalizado-modal";
+import { EditarEmprestimoModal } from "@/components/emprestimos/editar-emprestimo-modal";
 import { ExcluirEmprestimoButton } from "@/components/emprestimos/excluir-emprestimo-button";
 import { formatDateBR } from "@/lib/date";
+import { toLocalCalendarDate } from "@/lib/parcel-schedule";
 
 const emprestimoStatusLabel: Record<string, string> = {
   ativo: "Ativo",
@@ -83,11 +85,28 @@ export default async function EmprestimosPage() {
                       </td>
                       <td className="p-3">{emprestimoStatusLabel[e.status] ?? e.status}</td>
                       <td className="p-3 text-right">
-                        <ExcluirEmprestimoButton
-                          id={e.id}
-                          clienteNome={e.cliente.nome}
-                          valorLabel={toCurrency(Number(e.valor_emprestado))}
-                        />
+                        <div className="flex justify-end gap-2">
+                          <EditarEmprestimoModal
+                            emprestimo={{
+                              id: e.id,
+                              clienteNome: e.cliente.nome,
+                              valorEmprestado: Number(e.valor_emprestado),
+                              valorParcela: Number(e.valor_parcela),
+                              parcelas: parcelasOrdenadas.map((p) => ({
+                                id: p.id,
+                                numero_parcela: p.numero_parcela,
+                                status: p.status,
+                                valor_original: Number(p.valor_original),
+                                vencimento: formatDateBR(toLocalCalendarDate(new Date(p.vencimento)))
+                              }))
+                            }}
+                          />
+                          <ExcluirEmprestimoButton
+                            id={e.id}
+                            clienteNome={e.cliente.nome}
+                            valorLabel={toCurrency(Number(e.valor_emprestado))}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );

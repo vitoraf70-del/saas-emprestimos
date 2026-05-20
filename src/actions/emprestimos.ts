@@ -4,6 +4,7 @@ import { addMonths } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { recalculateParcela } from "@/actions/parcelas";
 import { LoanAmount, LoanInstallments, getInstallmentValue } from "@/lib/loan-plans";
 import { parseDateFromInput } from "@/lib/date";
 import {
@@ -177,6 +178,87 @@ function revalidateEmprestimoViews() {
   revalidatePath("/emprestimos");
   revalidatePath("/parcelas");
   revalidatePath("/clientes", "layout");
+}
+
+export type UpdateEmprestimoParcelaInput = {
+  id: string;
+  valorOriginal: number;
+  vencimento: string;
+};
+
+export type UpdateEmprestimoInput = {
+  valorEmprestado?: number;
+  valorParcela?: number;
+  parcelas?: UpdateEmprestimoParcelaInput[];
+};
+
+export async function updateEmprestimo(emprestimoId: string, input: UpdateEmprestimoInput) {
+  const emprestimo = await prisma.emprestimo.findUnique({
+    where: { id: emprestimoId },
+    include: { parcelas: { orderBy: { numero_parcela: "asc" } } }
+  });
+  if (!emprestimo) throw new Error("Empréstimo não encontrado.");
+
+  if (input.valorEmprestado != null && input.valorEmprestado <= 0) {
+    throw new Error("Valor emprestado deve ser maior que zero.");
+  }
+
+  const parcelasPayload = input.parcelas ?? [];
+  for (const p of parcelasPayload) {
+    const parcela = emprestimo.parcelas.find((item) => item.id === p.id);
+    if (!parcela) throw new Error("Parcela não encontrada neste empréstimo.");
+    if (parcela.status === "paga") {
+      throw new Error(`Parcela ${parcela.numero_parcela} já está paga e não pode ser alterada.`);
+    }
+    if (p.valorOriginal <= 0) throw new Error("Valor da parcela deve ser maior que zero.");
+    if (!parseDateFromInput(p.vencimento)) {
+      throw new Error(`Vencimento inválido na parcela ${parcela.numero_parcela}. Use DD/MM/AAAA.`);
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (input.valorEmprestado != null) {
+      await tx.emprestimo.update({
+        where: { id: emprestimoId },
+        data: { valor_emprestado: input.valorEmprestado }
+      });
+    }
+
+    if (input.valorParcela != null && input.valorParcela > 0) {
+      await tx.emprestimo.update({
+        where: { id: emprestimoId },
+        data: { valor_parcela: input.valorParcela }
+      });
+    }
+
+    for (const p of parcelasPayload) {
+      const vencimento = parseDateFromInput(p.vencimento)!;
+      await tx.parcela.update({
+        where: { id: p.id },
+        data: {
+          valor_original: p.valorOriginal,
+          valor_atualizado: p.valorOriginal,
+          vencimento,
+          dias_atraso: 0,
+          multa_valor: 0,
+          juros_valor: 0,
+          status: "pendente"
+        }
+      });
+    }
+
+    await syncEmprestimoStatus(emprestimoId, tx);
+  });
+
+  const abertas = await prisma.parcela.findMany({
+    where: { emprestimo_id: emprestimoId, status: { in: ["pendente", "vencida"] } },
+    select: { id: true }
+  });
+  for (const { id } of abertas) {
+    await recalculateParcela(id);
+  }
+
+  revalidateEmprestimoViews();
 }
 
 export async function deleteEmprestimo(emprestimoId: string) {

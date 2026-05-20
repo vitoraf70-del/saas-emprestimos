@@ -38,4 +38,9 @@ export async function recalculateOpenParcelas() {
   for (const parcela of parcelas) {
     await recalculateParcela(parcela.id);
   }
+
+  const emprestimoIds = await prisma.emprestimo.findMany({ select: { id: true } });
+  for (const { id } of emprestimoIds) {
+    await syncEmprestimoStatus(id);
+  }
 }

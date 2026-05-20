@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createEmprestimoSimples } from "@/actions/emprestimos";
 import { isValidInstallments, isValidLoanAmount } from "@/lib/loan-plans";
 
@@ -34,6 +35,10 @@ export async function POST(request: Request) {
     primeiroVencimento: String(body.primeiroVencimento),
     parcelasVencimentos
   });
+
+  revalidatePath("/");
+  revalidatePath("/emprestimos");
+  revalidatePath("/parcelas");
 
   return NextResponse.json(emprestimo, { status: 201 });
 }

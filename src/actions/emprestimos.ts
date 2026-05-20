@@ -1,7 +1,9 @@
 "use server";
 
 import { addMonths } from "date-fns";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { LoanAmount, LoanInstallments, getInstallmentValue } from "@/lib/loan-plans";
 import { parseDateFromInput } from "@/lib/date";
 import {
@@ -46,6 +48,8 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
       }))
     });
 
+    await syncEmprestimoStatus(emprestimo.id, tx);
+    revalidateEmprestimoViews();
     return emprestimo;
   });
 }
@@ -96,6 +100,8 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
       }))
     });
 
+    await syncEmprestimoStatus(emprestimo.id, tx);
+    revalidateEmprestimoViews();
     return emprestimo;
   });
 }
@@ -160,8 +166,17 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
       }))
     });
 
+    await syncEmprestimoStatus(emprestimo.id, tx);
+    revalidateEmprestimoViews();
     return emprestimo;
   });
+}
+
+function revalidateEmprestimoViews() {
+  revalidatePath("/");
+  revalidatePath("/emprestimos");
+  revalidatePath("/parcelas");
+  revalidatePath("/clientes", "layout");
 }
 
 export async function deleteEmprestimo(emprestimoId: string) {
@@ -171,4 +186,5 @@ export async function deleteEmprestimo(emprestimoId: string) {
     });
     await tx.emprestimo.delete({ where: { id: emprestimoId } });
   });
+  revalidateEmprestimoViews();
 }

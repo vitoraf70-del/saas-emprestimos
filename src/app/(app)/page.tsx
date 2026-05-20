@@ -1,8 +1,10 @@
+import { recalculateOpenParcelas } from "@/actions/parcelas";
 import { DashboardCharts } from "@/components/dashboard/charts";
 import { OverviewCards } from "@/components/dashboard/overview-cards";
 import { getDashboardData } from "@/lib/queries/dashboard";
 
 export default async function DashboardPage() {
+  await recalculateOpenParcelas();
   const data = await getDashboardData();
 
   return (

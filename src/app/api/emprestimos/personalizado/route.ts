@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createEmprestimoPersonalizado } from "@/actions/emprestimos";
 import type { FrequenciaParcela } from "@/lib/parcel-schedule";
 
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
       primeiroVencimento: String(body.primeiroVencimento),
       parcelasVencimentos
     });
+
+    revalidatePath("/");
+    revalidatePath("/emprestimos");
+    revalidatePath("/parcelas");
 
     return NextResponse.json(emprestimo, { status: 201 });
   } catch (error) {

@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/cobrancas",
-      "schedule": "0 11 * * *"
+      "schedule": "50 2 * * *"
     }
   ]
 }

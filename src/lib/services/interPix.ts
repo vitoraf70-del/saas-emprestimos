@@ -1,6 +1,7 @@
 import { Agent, fetch as undiciFetch } from "undici";
 import type { RequestInit as UndiciRequestInit } from "undici";
 import { readFileSync } from "node:fs";
+import { getPublicAppUrl } from "@/lib/app-url";
 
 export { buildPixTxidFromSeed as buildInterTxidFromSeed } from "./pixTxid";
 
@@ -181,6 +182,92 @@ export async function interCreateCobrancaImediata(input: {
     pixCopiaECola,
     raw: json
   };
+}
+
+export function getInterWebhookCallbackUrl() {
+  const override = process.env.INTER_WEBHOOK_URL?.trim();
+  if (override) return override.replace(/\/$/, "");
+  return `${getPublicAppUrl()}/api/webhooks/pix/inter`;
+}
+
+export async function interPutPixWebhook(webhookUrl?: string) {
+  const env = readInterEnv();
+  const token = await getInterAccessToken(env);
+  const url = webhookUrl?.trim() || getInterWebhookCallbackUrl();
+
+  const { response, text } = await interFetch(
+    env,
+    `/pix/v2/webhook/${encodeURIComponent(env.pixKey)}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({ webhookUrl: url })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Inter webhook PUT falhou: ${response.status} ${text}`);
+  }
+
+  return { webhookUrl: url, raw: text ? JSON.parse(text) : null };
+}
+
+export async function interGetPixWebhook() {
+  const env = readInterEnv();
+  const token = await getInterAccessToken(env);
+
+  const { response, text } = await interFetch(
+    env,
+    `/pix/v2/webhook/${encodeURIComponent(env.pixKey)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json"
+      }
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Inter webhook GET falhou: ${response.status} ${text}`);
+  }
+
+  return JSON.parse(text) as { webhookUrl?: string; criacao?: string; [key: string]: unknown };
+}
+
+export async function interDeletePixWebhook() {
+  const env = readInterEnv();
+  const token = await getInterAccessToken(env);
+
+  const { response, text } = await interFetch(
+    env,
+    `/pix/v2/webhook/${encodeURIComponent(env.pixKey)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json"
+      }
+    }
+  );
+
+  if (response.status === 404) {
+    return { removed: false };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Inter webhook DELETE falhou: ${response.status} ${text}`);
+  }
+
+  return { removed: true, raw: text || null };
 }
 
 export async function interGetCobrancaImediata(txid: string) {

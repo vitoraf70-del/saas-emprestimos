@@ -65,7 +65,11 @@ vercel.json
 
 - O seed grava a senha do admin com bcrypt. Rode `npm run seed` após deploy ou defina `SEED_ADMIN_PASSWORD` no `.env`.
 - Configure `CRON_SECRET` na Vercel; o cron chama `/api/cron/cobrancas?secret=...` ou envia `Authorization: Bearer <secret>`.
-- **Inter:** cadastre o webhook em `https://SEU_DOMINIO/api/webhooks/pix/inter` com header `x-webhook-secret` = `PIX_INTER_WEBHOOK_SECRET`.
+- **Inter (webhook PIX):** URL `https://SEU_DOMINIO/api/webhooks/pix/inter`. Cadastro automático (com `CRON_SECRET` e variáveis Inter na Vercel):
+  - `POST https://SEU_DOMINIO/api/webhooks/pix/inter/register?secret=CRON_SECRET`
+  - ou local: `npm run inter:webhook` (defina `NEXT_PUBLIC_APP_URL` para produção)
+  - consultar: `GET .../register?secret=...` ou `npm run inter:webhook:status`
+  - O Inter **não** envia `x-webhook-secret`; a baixa valida `txid` no banco + status CONCLUIDA na API Inter.
 - **C6:** `https://SEU_DOMINIO/api/webhooks/pix/c6` (mesmo header, se usar).
 - Fallback genérico: `/api/pix/webhook` (Mercado Pago / Asaas).
 - Configure domínio e variáveis na Vercel.

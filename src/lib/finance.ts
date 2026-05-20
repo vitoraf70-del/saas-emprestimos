@@ -4,7 +4,8 @@ export const MULTA_ATRASO_FIXA = 50;
 export const JUROS_DIA_FIXO = 20;
 
 const DAILY_MS = 1000 * 60 * 60 * 24;
-const BR_TIMEZONE = "America/Sao_Paulo";
+/** Campo Grande (MS) — UTC−4 */
+const BR_TIMEZONE = "America/Campo_Grande";
 
 function calendarDayKey(date: Date, timeZone = BR_TIMEZONE) {
   return date.toLocaleDateString("en-CA", { timeZone });

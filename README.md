@@ -69,5 +69,5 @@ vercel.json
 - **C6:** `https://SEU_DOMINIO/api/webhooks/pix/c6` (mesmo header, se usar).
 - Fallback genérico: `/api/pix/webhook` (Mercado Pago / Asaas).
 - Configure domínio e variáveis na Vercel.
-- O cron do Vercel está em UTC: `11h`, `15h` e `21h` UTC (≈ 08h, 12h e 18h BRT) para permitir até 3 avisos no dia do vencimento.
+- Plano **Hobby** da Vercel: 1 cron por dia (`0 11 * * *` UTC ≈ 08h BRT), que roda cobrança WhatsApp + reconciliação PIX. Para 3 avisos/dia no vencimento, use plano **Pro** ou cron externo (ex. cron-job.org) chamando `/api/cron/cobrancas` com `CRON_SECRET`.
 - Configure Evolution API ou Z-API (`WHATSAPP_PROVIDER`) para o robô enviar mensagens.

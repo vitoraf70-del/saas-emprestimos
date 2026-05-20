@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reconciliarPagamentosPendentes } from "@/lib/services/pix-baixa";
 import { processarCobrancaAutomatica } from "@/lib/services/cobranca-automatica";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,10 @@ export async function GET(request: Request) {
     }
   }
 
-  const resultado = await processarCobrancaAutomatica();
-  return NextResponse.json({ ok: true, ...resultado });
+  const [cobranca, pixBaixa] = await Promise.all([
+    processarCobrancaAutomatica(),
+    reconciliarPagamentosPendentes()
+  ]);
+
+  return NextResponse.json({ ok: true, cobranca, pixBaixa });
 }

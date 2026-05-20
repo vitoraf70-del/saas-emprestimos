@@ -3,18 +3,6 @@
     {
       "path": "/api/cron/cobrancas",
       "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/api/cron/cobrancas",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/cobrancas",
-      "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/cron/pix-baixa",
-      "schedule": "*/15 * * * *"
     }
   ]
 }

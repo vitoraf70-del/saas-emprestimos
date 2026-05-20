@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { recalculateParcela } from "@/actions/parcelas";
+import { anchorVencimentoCampoGrande } from "@/lib/finance";
 import { LoanAmount, LoanInstallments, getInstallmentValue } from "@/lib/loan-plans";
 import { parseDateFromInput } from "@/lib/date";
 import {
@@ -45,7 +46,7 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
         numero_parcela: i + 1,
         valor_original: valorParcela,
         valor_atualizado: valorParcela,
-        vencimento: addMonths(new Date(input.dataInicio), i + 1)
+        vencimento: anchorVencimentoCampoGrande(addMonths(new Date(input.dataInicio), i + 1))
       }))
     });
 
@@ -97,7 +98,7 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
         numero_parcela: i + 1,
         valor_original: valorParcela,
         valor_atualizado: valorParcela,
-        vencimento
+        vencimento: anchorVencimentoCampoGrande(vencimento)
       }))
     });
 
@@ -163,7 +164,7 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
         numero_parcela: i + 1,
         valor_original: input.valorParcela,
         valor_atualizado: input.valorParcela,
-        vencimento
+        vencimento: anchorVencimentoCampoGrande(vencimento)
       }))
     });
 
@@ -232,7 +233,7 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
     }
 
     for (const p of parcelasPayload) {
-      const vencimento = parseDateFromInput(p.vencimento)!;
+      const vencimento = anchorVencimentoCampoGrande(parseDateFromInput(p.vencimento)!);
       await tx.parcela.update({
         where: { id: p.id },
         data: {

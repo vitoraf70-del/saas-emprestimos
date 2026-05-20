@@ -21,7 +21,8 @@ export async function recalculateParcela(parcelaId: string) {
       multa_valor: result.multaValor,
       juros_valor: result.jurosValor,
       valor_atualizado: result.valorAtualizado,
-      status: result.diasAtraso > 0 && parcela.status !== "paga" ? "vencida" : parcela.status
+      status:
+        parcela.status === "paga" ? "paga" : result.diasAtraso > 0 ? "vencida" : "pendente"
     }
   });
 

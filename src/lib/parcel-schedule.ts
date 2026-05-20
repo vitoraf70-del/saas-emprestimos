@@ -1,10 +1,11 @@
 import { addDays } from "date-fns";
+import { anchorVencimentoCampoGrande } from "@/lib/finance";
 
 /**
- * Ancora no calendário local (meio-dia) para evitar deslocar o dia por UTC/DST.
+ * Ancora o vencimento no calendário de Campo Grande (evita virar dia errado em UTC).
  */
 export function toLocalCalendarDate(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
+  return anchorVencimentoCampoGrande(date);
 }
 
 export function isDomingo(date: Date) {

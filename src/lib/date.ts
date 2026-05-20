@@ -2,10 +2,12 @@ import { format, isValid, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function formatDateBR(date: Date) {
+  if (!date || !isValid(date)) return "—";
   return format(date, "dd/MM/yyyy", { locale: ptBR });
 }
 
 export function formatDateWithWeekdayBR(date: Date) {
+  if (!date || !isValid(date)) return "—";
   return `${format(date, "dd/MM/yyyy", { locale: ptBR })} (${format(date, "EEEE", {
     locale: ptBR
   })})`;

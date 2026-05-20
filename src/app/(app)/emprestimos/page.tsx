@@ -81,7 +81,9 @@ export default async function EmprestimosPage() {
                         {pagas}/{e.numero_parcelas} pagas
                       </td>
                       <td className="p-3">
-                        {proximaAberta ? formatDateBR(new Date(proximaAberta.vencimento)) : "—"}
+                        {proximaAberta
+                          ? formatDateBR(toLocalCalendarDate(new Date(proximaAberta.vencimento)))
+                          : "—"}
                       </td>
                       <td className="p-3">{emprestimoStatusLabel[e.status] ?? e.status}</td>
                       <td className="p-3 text-right">

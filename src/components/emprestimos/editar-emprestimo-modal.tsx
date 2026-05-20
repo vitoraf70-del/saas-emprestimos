@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { formatDateBR, formatDateMask } from "@/lib/date";
+import { formatDateMask } from "@/lib/date";
 import { toCurrency } from "@/lib/utils";
 
 export type EmprestimoEditSnapshot = {
@@ -178,7 +178,7 @@ export function EditarEmprestimoModal({ emprestimo }: { emprestimo: EmprestimoEd
                   {parcelasPagas.map((p) => (
                     <li key={p.id}>
                       Parcela {p.numero_parcela}: {toCurrency(Number(p.valor_original))} — venc.{" "}
-                      {formatDateBR(new Date(p.vencimento))}
+                      {p.vencimento}
                     </li>
                   ))}
                 </ul>

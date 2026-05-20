@@ -121,57 +121,82 @@ const INTER_SCOPE_WEBHOOK = "webhook.read webhook.write";
 
 const tokenCache = new Map<string, { token: string; expiresAtMs: number }>();
 
-async function getInterAccessToken(env: InterEnv, scope: string) {
-  const now = Date.now();
-  const cached = tokenCache.get(scope);
-  if (cached && cached.expiresAtMs - now > 30_000) {
-    return cached.token;
-  }
-
-  const body = new URLSearchParams({
-    client_id: env.clientId,
-    client_secret: env.clientSecret,
-    grant_type: "client_credentials",
-    scope
-  });
-
-  const { response, text } = await interFetch(env, "/oauth/v2/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json"
-    },
-    body
-  });
-
-  if (!response.ok) {
-    throw new Error(`Inter OAuth falhou: ${response.status} ${text}`);
-  }
-
-  const json = JSON.parse(text) as { access_token: string; expires_in?: number };
-  if (!json.access_token) {
-    throw new Error("Inter OAuth retornou access_token vazio");
-  }
-
-  const expiresInSec = typeof json.expires_in === "number" ? json.expires_in : 3600;
-  tokenCache.set(scope, {
-    token: json.access_token,
-    expiresAtMs: Date.now() + Math.max(60, expiresInSec - 60) * 1000
-  });
-
-  return json.access_token;
+function uniqueScopes(scopes: Array<string | undefined>) {
+  return [...new Set(scopes.map((s) => s?.trim()).filter(Boolean) as string[])];
 }
 
-function resolveInterOAuthScope(mode: "pix" | "webhook") {
+function isInterInvalidScopeError(status: number, text: string) {
+  return status === 401 && /registered scope|invalid_scope/i.test(text);
+}
+
+function scopeCandidatesForMode(mode: "pix" | "webhook") {
   const custom = process.env.INTER_OAUTH_SCOPE?.trim();
-  if (custom) return custom;
+  if (custom) return [custom];
 
   if (mode === "webhook") {
-    const webhookOnly = process.env.INTER_OAUTH_SCOPE_WEBHOOK?.trim();
-    return webhookOnly ?? `${INTER_SCOPE_PIX_COB} ${INTER_SCOPE_WEBHOOK}`;
+    return uniqueScopes([
+      process.env.INTER_OAUTH_SCOPE_WEBHOOK?.trim(),
+      `${INTER_SCOPE_PIX_COB} ${INTER_SCOPE_WEBHOOK}`,
+      INTER_SCOPE_WEBHOOK
+    ]);
   }
 
-  return INTER_SCOPE_PIX_COB;
+  return uniqueScopes([
+    INTER_SCOPE_PIX_COB,
+    "cob.write cob.read pix.write pix.read",
+    "cob.write cob.read",
+    "cob.write",
+    "pix.write pix.read"
+  ]);
+}
+
+async function getInterAccessTokenForMode(env: InterEnv, mode: "pix" | "webhook") {
+  const now = Date.now();
+  let lastError = "nenhuma tentativa";
+
+  for (const scope of scopeCandidatesForMode(mode)) {
+    const cached = tokenCache.get(scope);
+    if (cached && cached.expiresAtMs - now > 30_000) {
+      return cached.token;
+    }
+
+    const body = new URLSearchParams({
+      client_id: env.clientId,
+      client_secret: env.clientSecret,
+      grant_type: "client_credentials",
+      scope
+    });
+
+    const { response, text } = await interFetch(env, "/oauth/v2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json"
+      },
+      body
+    });
+
+    if (response.ok) {
+      const json = JSON.parse(text) as { access_token: string; expires_in?: number };
+      if (!json.access_token) {
+        throw new Error("Inter OAuth retornou access_token vazio");
+      }
+
+      const expiresInSec = typeof json.expires_in === "number" ? json.expires_in : 3600;
+      tokenCache.set(scope, {
+        token: json.access_token,
+        expiresAtMs: Date.now() + Math.max(60, expiresInSec - 60) * 1000
+      });
+      return json.access_token;
+    }
+
+    lastError = `${response.status} ${text}`;
+    if (!isInterInvalidScopeError(response.status, text)) {
+      break;
+    }
+  }
+
+  throw new Error(`Inter OAuth falhou: ${lastError}`);
 }
 
 export async function interCreateCobrancaImediata(input: {
@@ -182,7 +207,7 @@ export async function interCreateCobrancaImediata(input: {
   devedor?: { cpf: string; nome: string };
 }) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env, resolveInterOAuthScope("pix"));
+  const token = await getInterAccessTokenForMode(env, "pix");
 
   const payload = {
     calendario: { expiracao: input.expiracaoSegundos ?? 180 },
@@ -229,7 +254,7 @@ export function getInterWebhookCallbackUrl() {
 
 export async function interPutPixWebhook(webhookUrl?: string) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
+  const token = await getInterAccessTokenForMode(env, "webhook");
   const url = webhookUrl?.trim() || getInterWebhookCallbackUrl();
 
   const { response, text } = await interFetch(
@@ -255,7 +280,7 @@ export async function interPutPixWebhook(webhookUrl?: string) {
 
 export async function interGetPixWebhook() {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
+  const token = await getInterAccessTokenForMode(env, "webhook");
 
   const { response, text } = await interFetch(
     env,
@@ -282,7 +307,7 @@ export async function interGetPixWebhook() {
 
 export async function interDeletePixWebhook() {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env, resolveInterOAuthScope("webhook"));
+  const token = await getInterAccessTokenForMode(env, "webhook");
 
   const { response, text } = await interFetch(
     env,
@@ -309,7 +334,7 @@ export async function interDeletePixWebhook() {
 
 export async function interGetCobrancaImediata(txid: string) {
   const env = readInterEnv();
-  const token = await getInterAccessToken(env, resolveInterOAuthScope("pix"));
+  const token = await getInterAccessTokenForMode(env, "pix");
 
   const { response, text } = await interFetch(env, `/pix/v2/cob/${encodeURIComponent(txid)}`, {
     method: "GET",

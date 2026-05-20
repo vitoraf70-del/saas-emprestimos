@@ -15,7 +15,7 @@ function formatCpf(value: string) {
 export default async function PagarPage({
   searchParams
 }: {
-  searchParams: { cpf?: string };
+  searchParams: { cpf?: string; paid?: string };
 }) {
   const cpf = String(searchParams.cpf ?? "").trim();
   const normalizedCpf = cpf.replace(/\D/g, "");
@@ -57,6 +57,12 @@ export default async function PagarPage({
 
       <CpfSearchForm initialCpf={cpf} />
 
+      {searchParams.paid === "1" ? (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          Pagamento confirmado! Suas parcelas foram baixadas automaticamente no sistema.
+        </p>
+      ) : null}
+
       {cpf && !cliente ? <p className="text-sm text-red-600">CPF não encontrado.</p> : null}
 
       {cliente ? (
@@ -71,7 +77,9 @@ export default async function PagarPage({
               <p className="text-xs text-muted-foreground">{parcelas.length} parcela(s) em aberto</p>
             </div>
           ) : null}
-          {parcelas.length > 0 ? <PixSettlementButton parcelaIds={parcelas.map(({ parcela }) => parcela.id)} /> : null}
+          {parcelas.length > 0 ? (
+            <PixSettlementButton parcelaIds={parcelas.map(({ parcela }) => parcela.id)} cpf={cliente.cpf} />
+          ) : null}
 
           {parcelas.length === 0 ? (
             <p className="rounded-lg border p-3 text-sm">Você não possui parcelas pendentes no momento.</p>
@@ -88,7 +96,7 @@ export default async function PagarPage({
                   <p>Mora diária: {toCurrency(calc.jurosValor)}</p>
                   <p className="font-semibold">Total atualizado: {toCurrency(calc.valorAtualizado)}</p>
                 </div>
-                <PixCopyButton parcelaId={parcela.id} />
+                <PixCopyButton parcelaId={parcela.id} cpf={cliente.cpf} />
               </article>
             ))
           )}

@@ -21,8 +21,8 @@ Sistema SaaS de gestão de empréstimos e cobranças com foco em automação Wha
 - Gestão de empréstimos e parcelas
 - Recalculo automático de juros/multa por atraso
 - Cobrança pública por CPF (`/cobranca/[cpf]`) com QRCode PIX
-- Confirmação de pagamento e baixa automática da parcela
-- CRON diário de cobrança (`/api/cron/cobrancas`)
+- Baixa automática ao pagar PIX: webhook do banco + verificação na página `/pagar` + cron de reconciliação a cada 15 min
+- Robô de cobrança WhatsApp (`/api/cron/cobrancas`): 2 avisos 2 dias antes do vencimento, 3 no dia, e aviso diário em atraso com link `/pagar` e valor atualizado (multa/juros)
 - Relatórios exportáveis (PDF/Excel)
 
 ## Estrutura
@@ -63,7 +63,11 @@ vercel.json
 
 ## Observações de produção
 
-- Ajuste senha para hash seguro (bcrypt/argon2) antes de produção.
-- Configure webhook real do provedor PIX em `/api/pix/webhook`.
+- O seed grava a senha do admin com bcrypt. Rode `npm run seed` após deploy ou defina `SEED_ADMIN_PASSWORD` no `.env`.
+- Configure `CRON_SECRET` na Vercel; o cron chama `/api/cron/cobrancas?secret=...` ou envia `Authorization: Bearer <secret>`.
+- **Inter:** cadastre o webhook em `https://SEU_DOMINIO/api/webhooks/pix/inter` com header `x-webhook-secret` = `PIX_INTER_WEBHOOK_SECRET`.
+- **C6:** `https://SEU_DOMINIO/api/webhooks/pix/c6` (mesmo header, se usar).
+- Fallback genérico: `/api/pix/webhook` (Mercado Pago / Asaas).
 - Configure domínio e variáveis na Vercel.
-- O cron do Vercel está em UTC. `0 11 * * *` equivale a 08:00 BRT.
+- O cron do Vercel está em UTC: `11h`, `15h` e `21h` UTC (≈ 08h, 12h e 18h BRT) para permitir até 3 avisos no dia do vencimento.
+- Configure Evolution API ou Z-API (`WHATSAPP_PROVIDER`) para o robô enviar mensagens.

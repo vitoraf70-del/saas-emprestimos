@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { updateCliente } from "@/actions/clientes";
+import { deleteCliente, updateCliente } from "@/actions/clientes";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const body = await request.json();
@@ -42,4 +42,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   });
 
   return NextResponse.json(cliente);
+}
+
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const exists = await prisma.cliente.findUnique({ where: { id: params.id }, select: { id: true } });
+  if (!exists) {
+    return NextResponse.json({ error: "Cliente não encontrado." }, { status: 404 });
+  }
+
+  try {
+    await deleteCliente(params.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível excluir o cliente.";
+    const status = message.includes("empréstimos") ? 409 : 400;
+    return NextResponse.json({ error: message }, { status });
+  }
+
+  return NextResponse.json({ ok: true });
 }

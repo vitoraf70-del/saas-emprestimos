@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { processarCobrancaAutomatica } from "@/lib/services/cobranca-automatica";
+import { reconciliarPagamentosPendentes } from "@/lib/services/pix-baixa";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     }
   }
 
-  const resultado = await processarCobrancaAutomatica();
+  const resultado = await reconciliarPagamentosPendentes();
   return NextResponse.json({ ok: true, ...resultado });
 }

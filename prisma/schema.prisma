@@ -115,6 +115,10 @@ model Parcela {
   juros_valor     Decimal       @default(0) @db.Decimal(12, 2)
   valor_atualizado Decimal      @default(0) @db.Decimal(12, 2)
   status          StatusParcela @default(pendente)
+  avisos_antecipados Int        @default(0)
+  avisos_vencimento  Int        @default(0)
+  avisos_atraso      Int        @default(0)
+  ultimo_aviso_em    DateTime?
   emprestimo      Emprestimo    @relation(fields: [emprestimo_id], references: [id], onDelete: Cascade)
   pagamentos      Pagamento[]
 

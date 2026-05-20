@@ -1,11 +1,21 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { recalculateParcela } from "@/actions/parcelas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditarClienteModal } from "@/components/clientes/editar-cliente-modal";
+import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-button";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
+import { formatDateBR } from "@/lib/date";
+import { buildPagarLink } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
+
+const parcelaStatusLabel: Record<string, string> = {
+  pendente: "Pendente",
+  vencida: "Vencida",
+  paga: "Paga"
+};
 
 export default async function ClienteDetalhePage({
   params,
@@ -21,7 +31,9 @@ export default async function ClienteDetalhePage({
   });
   if (!cliente) return notFound();
 
-  const parcelas = cliente.emprestimos.flatMap((e) => e.parcelas);
+  const parcelas = cliente.emprestimos
+    .flatMap((e) => e.parcelas.map((p) => ({ ...p, emprestimo: e })))
+    .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime());
   const totalPago = parcelas.filter((p) => p.status === "paga").reduce((acc, p) => acc + Number(p.valor_atualizado), 0);
   const saldoRestante = parcelas.filter((p) => p.status !== "paga").reduce((acc, p) => acc + Number(p.valor_atualizado), 0);
   const jurosAcumulado = parcelas.reduce((acc, p) => acc + Number(p.juros_valor), 0);
@@ -46,14 +58,12 @@ export default async function ClienteDetalhePage({
       }
 
       const atualizada = await recalculateParcela(atrasadas[0].id);
-      const link = `${process.env.NEXT_PUBLIC_APP_URL}/pagar`;
+      const link = buildPagarLink(clienteAtual.cpf);
       await sendWhatsAppMessage({
         phone: clienteAtual.whatsapp,
         message: `Olá ${clienteAtual.nome}, sua parcela está em aberto. Valor atualizado: ${toCurrency(
           Number(atualizada.valor_atualizado)
-        )}. Abra o link e digite seu CPF para ver as parcelas e pagar: ${link}
-
-Regularize o mais rápido possível sua dívida para evitar acumular mais juros.`
+        )}. Pague pelo PIX: ${link}`
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao enviar WhatsApp.";
@@ -65,9 +75,18 @@ Regularize o mais rápido possível sua dívida para evitar acumular mais juros.
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-2xl font-bold">{cliente.nome}</h2>
-        <EditarClienteModal cliente={cliente} />
+        <div className="flex flex-wrap gap-2">
+          <EditarClienteModal cliente={cliente} />
+          <ExcluirClienteButton
+            id={cliente.id}
+            nome={cliente.nome}
+            emprestimosCount={cliente.emprestimos.length}
+            aposExcluirHref="/clientes"
+            size="default"
+          />
+        </div>
       </div>
       {searchParams.wa === "sent" ? (
         <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -88,9 +107,54 @@ Regularize o mais rápido possível sua dívida para evitar acumular mais juros.
         <Card><CardHeader><CardTitle>Vencidas</CardTitle></CardHeader><CardContent>{parcelas.filter((p) => p.status === "vencida").length}</CardContent></Card>
         <Card><CardHeader><CardTitle>Juros acumulado</CardTitle></CardHeader><CardContent>{toCurrency(jurosAcumulado)}</CardContent></Card>
       </div>
-      <form action={cobrarAction}>
-        <Button type="submit">Cobrar no WhatsApp</Button>
-      </form>
+      <div className="flex flex-wrap gap-2">
+        <form action={cobrarAction}>
+          <Button type="submit">Cobrar no WhatsApp</Button>
+        </form>
+        <Button asChild variant="outline">
+          <Link href={`/pagar?cpf=${encodeURIComponent(cliente.cpf)}`} target="_blank">
+            Abrir página de pagamento
+          </Link>
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Parcelas</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left">
+                <th className="p-3">Parcela</th>
+                <th className="p-3">Vencimento</th>
+                <th className="p-3">Valor</th>
+                <th className="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parcelas.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                    Nenhuma parcela cadastrada para este cliente.
+                  </td>
+                </tr>
+              ) : (
+                parcelas.map((parcela) => (
+                  <tr key={parcela.id} className="border-b">
+                    <td className="p-3">{parcela.numero_parcela}</td>
+                    <td className="p-3">{formatDateBR(new Date(parcela.vencimento))}</td>
+                    <td className="p-3">
+                      {toCurrency(Number(parcela.valor_atualizado || parcela.valor_original))}
+                    </td>
+                    <td className="p-3">{parcelaStatusLabel[parcela.status] ?? parcela.status}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

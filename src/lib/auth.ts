@@ -1,4 +1,5 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { compare } from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,13 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email }
         });
         if (!user?.passwordHash) return null;
-        if (credentials.password !== user.passwordHash) return null;
+
+        const hash = user.passwordHash;
+        const passwordOk = hash.startsWith("$2")
+          ? await compare(credentials.password, hash)
+          : credentials.password === hash;
+
+        if (!passwordOk) return null;
         return { id: user.id, name: user.name, email: user.email };
       }
     })

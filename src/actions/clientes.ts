@@ -30,3 +30,13 @@ export async function updateCliente(id: string, input: UpdateClienteInput) {
     data: input
   });
 }
+
+export async function deleteCliente(id: string) {
+  const emprestimos = await prisma.emprestimo.count({ where: { cliente_id: id } });
+  if (emprestimos > 0) {
+    throw new Error(
+      "Não é possível excluir: este cliente possui empréstimos cadastrados. Remova os empréstimos antes."
+    );
+  }
+  await prisma.cliente.delete({ where: { id } });
+}

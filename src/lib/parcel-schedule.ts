@@ -12,11 +12,22 @@ export function toLocalCalendarDate(date: Date): Date {
  * Cada parcela seguinte = data anterior + 7 dias (mesmo dia da semana).
  */
 export function buildWeeklyInstallmentDueDates(primeiroVencimento: Date, quantidade: number): Date[] {
+  return buildInstallmentDueDates(primeiroVencimento, quantidade, "semanal");
+}
+
+export type FrequenciaParcela = "diario" | "semanal";
+
+export function buildInstallmentDueDates(
+  primeiroVencimento: Date,
+  quantidade: number,
+  frequencia: FrequenciaParcela
+): Date[] {
+  const stepDays = frequencia === "diario" ? 1 : 7;
   const dates: Date[] = [];
   let cursor = toLocalCalendarDate(primeiroVencimento);
   for (let i = 0; i < quantidade; i++) {
     dates.push(new Date(cursor));
-    cursor = addDays(cursor, 7);
+    cursor = addDays(cursor, stepDays);
   }
   return dates;
 }

@@ -1,62 +1,39 @@
+import { recalculateOpenParcelas } from "@/actions/parcelas";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { toCurrency } from "@/lib/utils";
-import { diasAtraso, calcularParcelaAtualizada } from "@/lib/finance";
 import { NovoEmprestimoModal } from "@/components/emprestimos/novo-emprestimo-modal";
+import { NovoEmprestimoPersonalizadoModal } from "@/components/emprestimos/novo-emprestimo-personalizado-modal";
+import { ExcluirEmprestimoButton } from "@/components/emprestimos/excluir-emprestimo-button";
 import { formatDateBR } from "@/lib/date";
 
+const emprestimoStatusLabel: Record<string, string> = {
+  ativo: "Ativo",
+  quitado: "Quitado",
+  inadimplente: "Inadimplente"
+};
+
 export default async function EmprestimosPage() {
+  await recalculateOpenParcelas();
+
   const clientes = await prisma.cliente.findMany({
     select: { id: true, nome: true, cpf: true },
     orderBy: { nome: "asc" }
   });
-
-  const parcelasAbertas = await prisma.parcela.findMany({
-    where: { status: { in: ["pendente", "vencida"] } },
-    include: { emprestimo: true }
-  });
-
-  for (const parcela of parcelasAbertas) {
-    const atraso = diasAtraso(parcela.vencimento);
-    const calc = calcularParcelaAtualizada(Number(parcela.valor_original), atraso);
-
-    const novoStatus = atraso > 0 ? "vencida" : "pendente";
-    if (
-      parcela.dias_atraso !== calc.diasAtraso ||
-      Number(parcela.multa_valor) !== calc.multaValor ||
-      Number(parcela.juros_valor) !== calc.jurosValor ||
-      Number(parcela.valor_atualizado) !== calc.valorAtualizado ||
-      parcela.status !== novoStatus
-    ) {
-      await prisma.parcela.update({
-        where: { id: parcela.id },
-        data: {
-          dias_atraso: calc.diasAtraso,
-          multa_valor: calc.multaValor,
-          juros_valor: calc.jurosValor,
-          valor_atualizado: calc.valorAtualizado,
-          status: novoStatus
-        }
-      });
-    }
-  }
 
   const emprestimos = await prisma.emprestimo.findMany({
     include: { cliente: true, parcelas: true },
     orderBy: { created_at: "desc" }
   });
 
-  const statusLabel = (status: string) => {
-    if (status === "paga") return "Pago";
-    if (status === "vencida") return "Atrasado";
-    return "Pendente";
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Empréstimos</h2>
-        <NovoEmprestimoModal clientes={clientes} />
+        <div className="flex flex-wrap gap-2">
+          <NovoEmprestimoModal clientes={clientes} />
+          <NovoEmprestimoPersonalizadoModal clientes={clientes} />
+        </div>
       </div>
       <Card>
         <CardContent className="p-0">
@@ -67,6 +44,7 @@ export default async function EmprestimosPage() {
                 <th className="p-3">Valor</th>
                 <th className="p-3">Vencimento</th>
                 <th className="p-3">Status</th>
+                <th className="p-3 w-[1%] whitespace-nowrap text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -81,7 +59,14 @@ export default async function EmprestimosPage() {
                     <td className="p-3">
                       {principal ? formatDateBR(new Date(principal.vencimento)) : "-"}
                     </td>
-                    <td className="p-3">{statusLabel(principal?.status ?? "pendente")}</td>
+                    <td className="p-3">{emprestimoStatusLabel[e.status] ?? e.status}</td>
+                    <td className="p-3 text-right">
+                      <ExcluirEmprestimoButton
+                        id={e.id}
+                        clienteNome={e.cliente.nome}
+                        valorLabel={toCurrency(Number(principal?.valor_atualizado ?? e.valor_emprestado))}
+                      />
+                    </td>
                   </tr>
                 );
               })}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { toCurrency } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
         valor_atualizado: parcela.valor_atualizado
       }
     });
+    await syncEmprestimoStatus(parcela.emprestimo_id, tx);
   });
 
   await sendWhatsAppMessage({

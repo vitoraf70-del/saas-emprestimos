@@ -1,5 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
+import { toCurrency } from "@/lib/utils";
+
+export type CobrancaPixLookup = {
+  solicitacaoPagador: string;
+  status?: string;
+  valorOriginal?: number;
+};
 
 export function parseParcelaIdsFromSolicitacao(s: string) {
   const multi = s.match(/pids:([\w,]+)/);
@@ -17,23 +25,45 @@ function amountClose(a: number, b: number, tol = 0.02) {
   return Math.abs(a - b) <= tol;
 }
 
+async function notificarClientePagamento(parcelaIds: string[], valorPago: number) {
+  const parcela = await prisma.parcela.findFirst({
+    where: { id: { in: parcelaIds } },
+    include: { emprestimo: { include: { cliente: true } } }
+  });
+  if (!parcela?.emprestimo.cliente.whatsapp) return;
+
+  const qtd = parcelaIds.length;
+  const textoParcelas = qtd > 1 ? `${qtd} parcelas` : `parcela ${parcela.numero_parcela}`;
+
+  try {
+    await sendWhatsAppMessage({
+      phone: parcela.emprestimo.cliente.whatsapp,
+      message: `Pagamento confirmado! Recebemos ${toCurrency(valorPago)} referente à ${textoParcelas}. Obrigado, ${parcela.emprestimo.cliente.nome}!`
+    });
+  } catch {
+    // Baixa já foi feita; falha no WhatsApp não reverte o pagamento.
+  }
+}
+
 export async function confirmPagamentoByTxid(
   txid: string,
-  getSolicitacaoPagador: (id: string) => Promise<string>
+  getCobranca: (id: string) => Promise<CobrancaPixLookup | string>
 ) {
   const pagamento = await prisma.pagamento.findUnique({
     where: { transaction_id: txid }
   });
   if (!pagamento || pagamento.status === "confirmado") return false;
 
-  let solicitacao = "";
+  let cob: CobrancaPixLookup;
   try {
-    solicitacao = await getSolicitacaoPagador(txid);
+    const raw = await getCobranca(txid);
+    cob = typeof raw === "string" ? { solicitacaoPagador: raw } : raw;
   } catch {
-    solicitacao = "";
+    cob = { solicitacaoPagador: "" };
   }
 
-  const parcelaIds = parseParcelaIdsFromSolicitacao(solicitacao);
+  const pagoNoBanco = cob.status === "CONCLUIDA";
+  const parcelaIds = parseParcelaIdsFromSolicitacao(cob.solicitacaoPagador);
   const targetIds = parcelaIds.length > 0 ? parcelaIds : [pagamento.parcela_id];
 
   const parcelas = await prisma.parcela.findMany({
@@ -41,15 +71,21 @@ export async function confirmPagamentoByTxid(
   });
   if (parcelas.length === 0) return false;
 
-  let sum = 0;
-  for (const p of parcelas) {
-    const atraso = diasAtraso(p.vencimento);
-    const calc = calcularParcelaAtualizada(Number(p.valor_original), atraso);
-    sum += calc.valorAtualizado;
-  }
-
   const valorPagamento = Number(pagamento.valor_pago);
-  if (!amountClose(sum, valorPagamento)) {
+
+  if (!pagoNoBanco) {
+    const { calcularParcelaAtualizada, diasAtraso } = await import("@/lib/finance");
+    let sum = 0;
+    for (const p of parcelas) {
+      const atraso = diasAtraso(p.vencimento);
+      const calc = calcularParcelaAtualizada(Number(p.valor_original), atraso);
+      sum += calc.valorAtualizado;
+    }
+    const valorCob = cob.valorOriginal ?? sum;
+    if (!amountClose(sum, valorPagamento) && !amountClose(valorCob, valorPagamento)) {
+      return false;
+    }
+  } else if (cob.valorOriginal && !amountClose(cob.valorOriginal, valorPagamento)) {
     return false;
   }
 
@@ -67,11 +103,21 @@ export async function confirmPagamentoByTxid(
         where: { id: p.id },
         data: {
           status: "paga",
-          data_pagamento: new Date()
+          data_pagamento: new Date(),
+          dias_atraso: 0,
+          multa_valor: 0,
+          juros_valor: 0,
+          valor_atualizado: p.valor_original
         }
       });
     }
+
+    const emprestimoIds = [...new Set(parcelas.map((p) => p.emprestimo_id))];
+    for (const emprestimoId of emprestimoIds) {
+      await syncEmprestimoStatus(emprestimoId, tx);
+    }
   });
 
+  await notificarClientePagamento(targetIds, valorPagamento);
   return true;
 }

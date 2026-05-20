@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCobrancaPixInfo } from "@/lib/services/pix-baixa";
 import { confirmPagamentoByTxid } from "@/lib/services/pixWebhookConfirm";
 
 type PixItem = {
@@ -34,10 +35,9 @@ export async function POST(request: Request) {
     const txid = String(pix.txid ?? "").trim();
     if (!txid) continue;
 
-    const { interGetCobrancaImediata } = await import("@/lib/services/interPix");
     const ok = await confirmPagamentoByTxid(txid, async (id) => {
-      const cob = await interGetCobrancaImediata(id);
-      return String(cob.solicitacaoPagador ?? "");
+      const info = await getCobrancaPixInfo(id);
+      return info ?? { solicitacaoPagador: "" };
     });
     if (ok) processed += 1;
   }

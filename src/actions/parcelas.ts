@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 
 export async function recalculateParcela(parcelaId: string) {
   const parcela = await prisma.parcela.findUnique({
@@ -13,7 +14,7 @@ export async function recalculateParcela(parcelaId: string) {
   const dias = diasAtraso(parcela.vencimento);
   const result = calcularParcelaAtualizada(Number(parcela.valor_original), dias);
 
-  return prisma.parcela.update({
+  const updated = await prisma.parcela.update({
     where: { id: parcelaId },
     data: {
       dias_atraso: result.diasAtraso,
@@ -23,4 +24,18 @@ export async function recalculateParcela(parcelaId: string) {
       status: result.diasAtraso > 0 && parcela.status !== "paga" ? "vencida" : parcela.status
     }
   });
+
+  await syncEmprestimoStatus(parcela.emprestimo_id);
+  return updated;
+}
+
+export async function recalculateOpenParcelas() {
+  const parcelas = await prisma.parcela.findMany({
+    where: { status: { in: ["pendente", "vencida"] } },
+    select: { id: true }
+  });
+
+  for (const parcela of parcelas) {
+    await recalculateParcela(parcela.id);
+  }
 }

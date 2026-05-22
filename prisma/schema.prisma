@@ -101,6 +101,9 @@ model Emprestimo {
   created_at            DateTime         @default(now())
   cliente               Cliente          @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
   parcelas              Parcela[]
+
+  @@index([created_at])
+  @@index([status, created_at])
 }
 
 model Parcela {
@@ -123,6 +126,10 @@ model Parcela {
   pagamentos      Pagamento[]
 
   @@unique([emprestimo_id, numero_parcela])
+  @@index([status])
+  @@index([vencimento])
+  @@index([status, vencimento])
+  @@index([emprestimo_id, status])
 }
 
 model Pagamento {
@@ -134,4 +141,6 @@ model Pagamento {
   data_pagamento DateTime        @default(now())
   status         String
   parcela        Parcela         @relation(fields: [parcela_id], references: [id], onDelete: Restrict)
+
+  @@index([status])
 }

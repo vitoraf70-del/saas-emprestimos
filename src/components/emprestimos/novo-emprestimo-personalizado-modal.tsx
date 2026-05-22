@@ -1,33 +1,32 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { JUROS_DIA_FIXO, MULTA_ATRASO_FIXA } from "@/lib/finance";
-import { buildInstallmentDueDates } from "@/lib/parcel-schedule";
+import { formatDateWithWeekdayBR } from "@/lib/date";
+import { JUROS_DIA_FIXO, MULTA_ATRASO_FIXA, tomorrowCalendarDayKeyBR } from "@/lib/finance";
+import { buildInstallmentDueDatesFromDayKey } from "@/lib/parcel-schedule";
 import { toCurrency } from "@/lib/utils";
-
-type ClienteOption = {
-  id: string;
-  nome: string;
-  cpf: string;
-};
+import { useClientesOptions } from "@/components/emprestimos/use-clientes-options";
 
 type Frequencia = "diario" | "semanal";
 
-export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: ClienteOption[] }) {
+export function NovoEmprestimoPersonalizadoModal() {
   const router = useRouter();
+  const { clientes, loading: loadingClientes, load: loadClientes } = useClientesOptions();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) void loadClientes();
+  }, [open, loadClientes]);
   const [error, setError] = useState("");
   const [numeroParcelas, setNumeroParcelas] = useState(4);
   const [valorEmprestado, setValorEmprestado] = useState("500");
   const [valorParcela, setValorParcela] = useState("200");
   const [frequencia, setFrequencia] = useState<Frequencia>("semanal");
-  const [primeiroVencimento, setPrimeiroVencimento] = useState("");
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(tomorrowCalendarDayKeyBR);
 
   const valorEmprestadoNum = Number(valorEmprestado.replace(",", ".")) || 0;
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
@@ -36,13 +35,10 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
 
   const parcelasCalculadas = useMemo(() => {
     if (!primeiroVencimento) return [];
-    const dataBase = new Date(`${primeiroVencimento}T12:00:00`);
-    if (Number.isNaN(dataBase.getTime())) return [];
-    return buildInstallmentDueDates(dataBase, numeroParcelas, frequencia);
+    return buildInstallmentDueDatesFromDayKey(primeiroVencimento, numeroParcelas, frequencia);
   }, [numeroParcelas, primeiroVencimento, frequencia]);
 
-  const parcelasCalculadasISO = parcelasCalculadas.map((data) => format(data, "yyyy-MM-dd"));
-  const parcelasResumo = parcelasCalculadas.map((data) => format(data, "dd/MM (EEE)", { locale: ptBR }));
+  const parcelasResumo = parcelasCalculadas.map((data) => formatDateWithWeekdayBR(data));
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,8 +53,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
       numeroParcelas: Number(data.get("numeroParcelas") ?? 0),
       valorParcela: Number(String(data.get("valorParcela") ?? "").replace(",", ".")),
       frequencia: String(data.get("frequencia") ?? "semanal"),
-      primeiroVencimento: String(data.get("primeiroVencimento") ?? ""),
-      parcelasVencimentos: parcelasCalculadasISO
+      primeiroVencimento: String(data.get("primeiroVencimento") ?? "")
     };
 
     const response = await fetch("/api/emprestimos/personalizado", {
@@ -79,7 +74,7 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
     setValorEmprestado("500");
     setValorParcela("200");
     setFrequencia("semanal");
-    setPrimeiroVencimento("");
+    setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
     setOpen(false);
     form.reset();
     router.refresh();
@@ -87,7 +82,14 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
 
   return (
     <>
-      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => {
+          setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
+          setOpen(true);
+        }}
+      >
         Empréstimo personalizado
       </Button>
 
@@ -97,8 +99,15 @@ export function NovoEmprestimoPersonalizadoModal({ clientes }: { clientes: Clien
             <DialogTitle>Empréstimo personalizado</DialogTitle>
           </DialogHeader>
           <form onSubmit={onSubmit} className="grid gap-3">
-            <select required name="clienteId" className="rounded-md border p-2">
-              <option value="">Selecione um cliente</option>
+            <select
+              required
+              name="clienteId"
+              className="rounded-md border p-2"
+              disabled={loadingClientes}
+            >
+              <option value="">
+                {loadingClientes ? "Carregando clientes..." : "Selecione um cliente"}
+              </option>
               {clientes.map((cliente) => (
                 <option key={cliente.id} value={cliente.id}>
                   {cliente.nome} - {cliente.cpf}

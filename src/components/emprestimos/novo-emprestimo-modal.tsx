@@ -1,38 +1,36 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { formatDateWithWeekdayBR } from "@/lib/date";
+import { tomorrowCalendarDayKeyBR } from "@/lib/finance";
 import { LOAN_AMOUNTS, LOAN_INSTALLMENTS, LOAN_PLANS } from "@/lib/loan-plans";
+import { buildInstallmentDueDatesFromDayKey } from "@/lib/parcel-schedule";
 import { toCurrency } from "@/lib/utils";
+import { useClientesOptions } from "@/components/emprestimos/use-clientes-options";
 
-type ClienteOption = {
-  id: string;
-  nome: string;
-  cpf: string;
-};
-
-export function NovoEmprestimoModal({ clientes }: { clientes: ClienteOption[] }) {
+export function NovoEmprestimoModal() {
   const router = useRouter();
+  const { clientes, loading: loadingClientes, load: loadClientes } = useClientesOptions();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) void loadClientes();
+  }, [open, loadClientes]);
   const [valorSelecionado, setValorSelecionado] = useState<number>(500);
   const [parcelasSelecionadas, setParcelasSelecionadas] = useState<number>(4);
-  const [primeiroVencimento, setPrimeiroVencimento] = useState("");
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(tomorrowCalendarDayKeyBR);
 
   const valorParcela = LOAN_PLANS[valorSelecionado as 500 | 700 | 1000][parcelasSelecionadas as 4 | 6 | 8];
   const totalFinal = valorParcela * parcelasSelecionadas;
   const parcelasCalculadas = useMemo(() => {
     if (!primeiroVencimento) return [];
-    const dataBase = new Date(`${primeiroVencimento}T12:00:00`);
-    if (Number.isNaN(dataBase.getTime())) return [];
-    return Array.from({ length: parcelasSelecionadas }, (_, index) => addDays(dataBase, index * 7));
+    return buildInstallmentDueDatesFromDayKey(primeiroVencimento, parcelasSelecionadas, "semanal");
   }, [parcelasSelecionadas, primeiroVencimento]);
-  const parcelasCalculadasISO = parcelasCalculadas.map((data) => format(data, "yyyy-MM-dd"));
-  const parcelasResumo = parcelasCalculadas.map((data) => format(data, "dd/MM (EEE)", { locale: ptBR }));
+  const parcelasResumo = parcelasCalculadas.map((data) => formatDateWithWeekdayBR(data));
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,8 +42,7 @@ export function NovoEmprestimoModal({ clientes }: { clientes: ClienteOption[] })
       clienteId: String(data.get("clienteId") ?? ""),
       valor: Number(data.get("valor") ?? 0),
       numeroParcelas: Number(data.get("numeroParcelas") ?? 0),
-      primeiroVencimento: String(data.get("primeiroVencimento") ?? ""),
-      parcelasVencimentos: parcelasCalculadasISO
+      primeiroVencimento: String(data.get("primeiroVencimento") ?? "")
     };
 
     const response = await fetch("/api/emprestimos", {
@@ -59,7 +56,7 @@ export function NovoEmprestimoModal({ clientes }: { clientes: ClienteOption[] })
 
     setValorSelecionado(500);
     setParcelasSelecionadas(4);
-    setPrimeiroVencimento("");
+    setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
     setOpen(false);
     form.reset();
     router.refresh();
@@ -67,7 +64,13 @@ export function NovoEmprestimoModal({ clientes }: { clientes: ClienteOption[] })
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        onClick={() => {
+          setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
+          setOpen(true);
+        }}
+      >
         Novo empréstimo
       </Button>
 
@@ -77,8 +80,15 @@ export function NovoEmprestimoModal({ clientes }: { clientes: ClienteOption[] })
             <DialogTitle>Novo Empréstimo</DialogTitle>
           </DialogHeader>
           <form onSubmit={onSubmit} className="grid gap-3">
-            <select required name="clienteId" className="rounded-md border p-2">
-              <option value="">Selecione um cliente</option>
+            <select
+              required
+              name="clienteId"
+              className="rounded-md border p-2"
+              disabled={loadingClientes}
+            >
+              <option value="">
+                {loadingClientes ? "Carregando clientes..." : "Selecione um cliente"}
+              </option>
               {clientes.map((cliente) => (
                 <option key={cliente.id} value={cliente.id}>
                   {cliente.nome} - {cliente.cpf}

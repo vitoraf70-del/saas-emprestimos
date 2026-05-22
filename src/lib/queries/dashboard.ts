@@ -5,29 +5,45 @@ const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
   Number(value ?? 0);
 
 export async function getDashboardData() {
-  const [emprestimos, pagamentos, parcelas, clientes] = await Promise.all([
-    prisma.emprestimo.findMany({ include: { parcelas: true } }),
-    prisma.pagamento.findMany(),
-    prisma.parcela.findMany({ include: { emprestimo: true } }),
+  const [
+    emprestadoAgg,
+    recebidoAgg,
+    aReceberAgg,
+    parcelasVencidas,
+    atrasoAgg,
+    parcelasPorStatus,
+    clientes
+  ] = await Promise.all([
+    prisma.emprestimo.aggregate({ _sum: { valor_emprestado: true } }),
+    prisma.pagamento.aggregate({
+      where: { status: "confirmado" },
+      _sum: { valor_pago: true }
+    }),
+    prisma.parcela.aggregate({
+      where: { status: { not: "paga" } },
+      _sum: { valor_atualizado: true }
+    }),
+    prisma.parcela.count({ where: { status: "vencida" } }),
+    prisma.parcela.aggregate({
+      where: { status: "vencida" },
+      _sum: { valor_atualizado: true }
+    }),
+    prisma.parcela.groupBy({
+      by: ["status"],
+      _count: { id: true }
+    }),
     prisma.cliente.count()
   ]);
 
-  const totalEmprestado = emprestimos.reduce((acc, item) => acc + toNumber(item.valor_emprestado), 0);
-  const totalRecebido = pagamentos
-    .filter((p) => p.status === "confirmado")
-    .reduce((acc, item) => acc + toNumber(item.valor_pago), 0);
-  const totalAReceber = parcelas
-    .filter((p) => p.status !== "paga")
-    .reduce((acc, item) => acc + toNumber(item.valor_atualizado || item.valor_original), 0);
+  const totalEmprestado = toNumber(emprestadoAgg._sum.valor_emprestado);
+  const totalRecebido = toNumber(recebidoAgg._sum.valor_pago);
+  const totalAReceber = toNumber(aReceberAgg._sum.valor_atualizado);
   const lucroTotal = totalRecebido - totalEmprestado;
   const lucroPercentual = totalEmprestado ? (lucroTotal / totalEmprestado) * 100 : 0;
+  const valorEmAtraso = toNumber(atrasoAgg._sum.valor_atualizado);
 
-  const parcelasVencidas = parcelas.filter((p) => p.status === "vencida").length;
-  const valorEmAtraso = parcelas
-    .filter((p) => p.status === "vencida")
-    .reduce((acc, p) => acc + toNumber(p.valor_atualizado), 0);
-
-  const inadimplenciaPercentual = parcelas.length ? (parcelasVencidas / parcelas.length) * 100 : 0;
+  const totalParcelas = parcelasPorStatus.reduce((acc, row) => acc + row._count.id, 0);
+  const inadimplenciaPercentual = totalParcelas ? (parcelasVencidas / totalParcelas) * 100 : 0;
 
   return {
     cards: {

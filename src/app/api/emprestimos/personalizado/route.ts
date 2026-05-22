@@ -33,25 +33,13 @@ export async function POST(request: Request) {
     const valorEmprestado = Number(body.valorEmprestado);
     const numeroParcelas = Number(body.numeroParcelas);
     const valorParcela = Number(body.valorParcela);
-    const parcelasVencimentos = Array.isArray(body.parcelasVencimentos)
-      ? body.parcelasVencimentos.map((item: unknown) => String(item))
-      : [];
-
-    if (parcelasVencimentos.length > 0 && parcelasVencimentos.length !== numeroParcelas) {
-      return NextResponse.json(
-        { error: "Quantidade de vencimentos incompatível com o número de parcelas." },
-        { status: 400 }
-      );
-    }
-
     const emprestimo = await createEmprestimoPersonalizado({
       clienteId: String(body.clienteId),
       valorEmprestado,
       numeroParcelas,
       valorParcela,
       frequencia,
-      primeiroVencimento: String(body.primeiroVencimento),
-      parcelasVencimentos
+      primeiroVencimento: String(body.primeiroVencimento)
     });
 
     revalidatePath("/");

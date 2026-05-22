@@ -22,7 +22,7 @@ Sistema SaaS de gestão de empréstimos e cobranças com foco em automação Wha
 - Recalculo automático de juros/multa por atraso
 - Cobrança pública por CPF (`/cobranca/[cpf]`) com QRCode PIX
 - Baixa automática ao pagar PIX: webhook do banco + verificação na página `/pagar` + cron de reconciliação a cada 15 min
-- Robô de cobrança WhatsApp (`/api/cron/cobrancas`): 2 avisos 2 dias antes do vencimento, 3 no dia, e aviso diário em atraso com link `/pagar` e valor atualizado (multa/juros)
+- Robô de cobrança WhatsApp (`/api/cron/cobrancas`): lembrete às **19:00** com 2 e 1 dia de antecedência; **3 avisos no dia** do vencimento (14:00, 20:00, 23:40); aviso diário em atraso com link `/pagar` e valor atualizado (multa/juros)
 - Relatórios exportáveis (PDF/Excel)
 
 ## Estrutura
@@ -73,5 +73,5 @@ vercel.json
 - **C6:** `https://SEU_DOMINIO/api/webhooks/pix/c6` (mesmo header, se usar).
 - Fallback genérico: `/api/pix/webhook` (Mercado Pago / Asaas).
 - Configure domínio e variáveis na Vercel.
-- Plano **Hobby** da Vercel: 1 cron por dia (`50 3 * * *` UTC ≈ **23:50 em Campo Grande/MS**), cobrança WhatsApp + reconciliação PIX antes da virada do dia. Juros/vencimento usam fuso `America/Campo_Grande`. Para avisos em outros horários, use cron-job.org com o mesmo endpoint e `CRON_SECRET`.
+- Cron de cobrança (`vercel.json`), fuso `America/Campo_Grande`: **19:00** (antecipados); **14:00**, **20:00**, **23:40** (vencimento). UTC: `0 23`, `0 18`, `0 0`, `40 3`. Muitos clientes: envio **paralelo** (`COBRANCA_CONCURRENCY`) e **continuação automática** até esvaziar a fila (resposta HTTP rápida para o cron-job.org). No **Hobby**, use [cron-job.org](https://cron-job.org): `GET .../api/cron/cobrancas?secret=CRON_SECRET`. Defina `NEXT_PUBLIC_APP_URL` para a continuação funcionar.
 - Configure Evolution API ou Z-API (`WHATSAPP_PROVIDER`) para o robô enviar mensagens.

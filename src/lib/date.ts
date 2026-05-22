@@ -1,27 +1,37 @@
-import { format, isValid, parse } from "date-fns";
+import { format, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  calendarDayKeyBR,
+  dateFromCalendarDayKey,
+  extractCalendarDayKey,
+  weekdayFromCalendarDayKey
+} from "@/lib/finance";
 
 export function formatDateBR(date: Date) {
   if (!date || !isValid(date)) return "—";
-  return format(date, "dd/MM/yyyy", { locale: ptBR });
+  const key = calendarDayKeyBR(date);
+  const [y, m, d] = key.split("-");
+  return `${d}/${m}/${y}`;
 }
 
 export function formatDateWithWeekdayBR(date: Date) {
   if (!date || !isValid(date)) return "—";
-  return `${format(date, "dd/MM/yyyy", { locale: ptBR })} (${format(date, "EEEE", {
-    locale: ptBR
-  })})`;
+  const key = calendarDayKeyBR(date);
+  const anchored = dateFromCalendarDayKey(key);
+  if (!anchored) return "—";
+  const weekday = weekdayFromCalendarDayKey(key);
+  const weekdayLabel = format(
+    new Date(Date.UTC(2024, 0, 7 + weekday)),
+    "EEEE",
+    { locale: ptBR }
+  );
+  return `${formatDateBR(date)} (${weekdayLabel})`;
 }
 
 export function parseDateFromInput(value: string) {
-  const trimmed = value.trim();
-  const parsedBR = parse(trimmed, "dd/MM/yyyy", new Date(), { locale: ptBR });
-  if (isValid(parsedBR)) return parsedBR;
-
-  const parsedISO = parse(trimmed, "yyyy-MM-dd", new Date());
-  if (isValid(parsedISO)) return parsedISO;
-
-  return null;
+  const key = extractCalendarDayKey(value);
+  if (!key) return null;
+  return dateFromCalendarDayKey(key);
 }
 
 export function formatDateMask(value: string) {

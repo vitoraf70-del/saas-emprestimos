@@ -5,14 +5,17 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { recalculateParcela } from "@/actions/parcelas";
-import { anchorVencimentoCampoGrande } from "@/lib/finance";
+import {
+  anchorVencimentoCampoGrande,
+  extractCalendarDayKey,
+  normalizeVencimento,
+  weekdayFromCalendarDayKey
+} from "@/lib/finance";
 import { LoanAmount, LoanInstallments, getInstallmentValue } from "@/lib/loan-plans";
 import { parseDateFromInput } from "@/lib/date";
 import {
-  buildInstallmentDueDates,
-  buildWeeklyInstallmentDueDates,
-  type FrequenciaParcela,
-  toLocalCalendarDate
+  buildInstallmentDueDatesFromDayKey,
+  type FrequenciaParcela
 } from "@/lib/parcel-schedule";
 
 type CreateEmprestimoInput = {
@@ -35,10 +38,13 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
         taxa_juros_percentual: input.taxaJurosPercentual,
         numero_parcelas: input.numeroParcelas,
         valor_parcela: valorParcela,
-        data_inicio: new Date(input.dataInicio),
+        data_inicio: parseDateFromInput(input.dataInicio) ?? new Date(),
         vencimento_dia: input.vencimentoDia
       }
     });
+
+    const dataInicio =
+      parseDateFromInput(input.dataInicio) ?? anchorVencimentoCampoGrande(new Date(input.dataInicio));
 
     await tx.parcela.createMany({
       data: Array.from({ length: input.numeroParcelas }, (_, i) => ({
@@ -46,7 +52,7 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
         numero_parcela: i + 1,
         valor_original: valorParcela,
         valor_atualizado: valorParcela,
-        vencimento: anchorVencimentoCampoGrande(addMonths(new Date(input.dataInicio), i + 1))
+        vencimento: normalizeVencimento(addMonths(dataInicio, i + 1))
       }))
     });
 
@@ -65,8 +71,8 @@ type CreateEmprestimoSimplesInput = {
 };
 
 export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInput) {
-  const primeiroVencimentoDate = parseDateFromInput(input.primeiroVencimento);
-  if (!primeiroVencimentoDate) {
+  const primeiroDayKey = extractCalendarDayKey(input.primeiroVencimento);
+  if (!primeiroDayKey) {
     throw new Error("Data de vencimento inválida. Use DD/MM/AAAA.");
   }
   const valorParcela = getInstallmentValue(input.valor, input.numeroParcelas);
@@ -80,17 +86,15 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
         numero_parcelas: input.numeroParcelas,
         valor_parcela: valorParcela,
         data_inicio: new Date(),
-        vencimento_dia: toLocalCalendarDate(primeiroVencimentoDate).getDay()
+        vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey)
       }
     });
 
-    const vencimentosInformados = (input.parcelasVencimentos ?? [])
-      .map((item) => parseDateFromInput(item))
-      .filter((item): item is Date => item !== null);
-    const vencimentos =
-      vencimentosInformados.length === input.numeroParcelas
-        ? vencimentosInformados
-        : buildWeeklyInstallmentDueDates(primeiroVencimentoDate, input.numeroParcelas);
+    const vencimentos = buildInstallmentDueDatesFromDayKey(
+      primeiroDayKey,
+      input.numeroParcelas,
+      "semanal"
+    );
 
     await tx.parcela.createMany({
       data: vencimentos.map((vencimento, i) => ({
@@ -98,7 +102,7 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
         numero_parcela: i + 1,
         valor_original: valorParcela,
         valor_atualizado: valorParcela,
-        vencimento: anchorVencimentoCampoGrande(vencimento)
+        vencimento
       }))
     });
 
@@ -119,8 +123,8 @@ type CreateEmprestimoPersonalizadoInput = {
 };
 
 export async function createEmprestimoPersonalizado(input: CreateEmprestimoPersonalizadoInput) {
-  const primeiroVencimentoDate = parseDateFromInput(input.primeiroVencimento);
-  if (!primeiroVencimentoDate) {
+  const primeiroDayKey = extractCalendarDayKey(input.primeiroVencimento);
+  if (!primeiroDayKey) {
     throw new Error("Data de vencimento inválida. Use DD/MM/AAAA.");
   }
   if (input.numeroParcelas < 1 || input.numeroParcelas > 120) {
@@ -144,19 +148,17 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
         numero_parcelas: input.numeroParcelas,
         valor_parcela: input.valorParcela,
         data_inicio: new Date(),
-        vencimento_dia: toLocalCalendarDate(primeiroVencimentoDate).getDay(),
+        vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey),
         multa_percentual: 0,
         juros_dia_percentual: 0
       }
     });
 
-    const vencimentosInformados = (input.parcelasVencimentos ?? [])
-      .map((item) => parseDateFromInput(item))
-      .filter((item): item is Date => item !== null);
-    const vencimentos =
-      vencimentosInformados.length === input.numeroParcelas
-        ? vencimentosInformados
-        : buildInstallmentDueDates(primeiroVencimentoDate, input.numeroParcelas, input.frequencia);
+    const vencimentos = buildInstallmentDueDatesFromDayKey(
+      primeiroDayKey,
+      input.numeroParcelas,
+      input.frequencia
+    );
 
     await tx.parcela.createMany({
       data: vencimentos.map((vencimento, i) => ({
@@ -164,7 +166,7 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
         numero_parcela: i + 1,
         valor_original: input.valorParcela,
         valor_atualizado: input.valorParcela,
-        vencimento: anchorVencimentoCampoGrande(vencimento)
+        vencimento
       }))
     });
 
@@ -233,7 +235,7 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
     }
 
     for (const p of parcelasPayload) {
-      const vencimento = anchorVencimentoCampoGrande(parseDateFromInput(p.vencimento)!);
+      const vencimento = normalizeVencimento(parseDateFromInput(p.vencimento)!);
       await tx.parcela.update({
         where: { id: p.id },
         data: {

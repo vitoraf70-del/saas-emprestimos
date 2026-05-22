@@ -31,17 +31,35 @@ export async function recalculateParcela(parcelaId: string) {
 }
 
 export async function recalculateOpenParcelas() {
+  const hoje = new Date();
   const parcelas = await prisma.parcela.findMany({
     where: { status: { in: ["pendente", "vencida"] } },
-    select: { id: true }
+    select: {
+      id: true,
+      status: true,
+      valor_original: true,
+      vencimento: true,
+      emprestimo_id: true
+    }
   });
 
-  for (const parcela of parcelas) {
-    await recalculateParcela(parcela.id);
-  }
+  await Promise.all(
+    parcelas.map((parcela) => {
+      const dias = diasAtraso(parcela.vencimento, hoje);
+      const result = calcularParcelaAtualizada(Number(parcela.valor_original), dias);
+      return prisma.parcela.update({
+        where: { id: parcela.id },
+        data: {
+          dias_atraso: result.diasAtraso,
+          multa_valor: result.multaValor,
+          juros_valor: result.jurosValor,
+          valor_atualizado: result.valorAtualizado,
+          status: result.diasAtraso > 0 ? "vencida" : "pendente"
+        }
+      });
+    })
+  );
 
   const emprestimoIds = await prisma.emprestimo.findMany({ select: { id: true } });
-  for (const { id } of emprestimoIds) {
-    await syncEmprestimoStatus(id);
-  }
+  await Promise.all(emprestimoIds.map(({ id }) => syncEmprestimoStatus(id)));
 }

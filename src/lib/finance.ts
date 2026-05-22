@@ -14,8 +14,63 @@ export function calendarDayKeyBR(date: Date, timeZone = BR_TIMEZONE) {
 /** Grava o vencimento no meio-dia em Campo Grande para não virar dia anterior no banco (UTC). */
 export function anchorVencimentoCampoGrande(date: Date) {
   const key = calendarDayKeyBR(date);
-  const [y, m, d] = key.split("-").map(Number);
+  return dateFromCalendarDayKey(key)!;
+}
+
+/** Garante Date de vencimento ancorado no dia do calendário de Campo Grande. */
+export function normalizeVencimento(date: Date) {
+  return dateFromCalendarDayKey(calendarDayKeyBR(date))!;
+}
+
+/** Converte "yyyy-MM-dd" (ou Date já ancorado) para o instante usado no banco. */
+export function dateFromCalendarDayKey(dayKey: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey.trim());
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
   return new Date(Date.UTC(y, m - 1, d, 16, 0, 0));
+}
+
+export function shiftCalendarDayKey(dayKey: string, days: number) {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const utc = Date.UTC(y, m - 1, d) + days * DAILY_MS;
+  const date = new Date(utc);
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Extrai yyyy-MM-dd de input ISO, BR ou date picker. */
+export function extractCalendarDayKey(value: string): string | null {
+  const trimmed = value.trim();
+  const isoPrefix = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  if (isoPrefix) return isoPrefix[1];
+
+  const brMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  if (brMatch) {
+    const [, dd, mm, yyyy] = brMatch;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
+export function tomorrowCalendarDayKeyBR(hoje = new Date()) {
+  return shiftCalendarDayKey(calendarDayKeyBR(hoje), 1);
+}
+
+/** Soma dias no calendário BR sem depender do fuso do servidor. */
+export function addCalendarDays(date: Date, days: number): Date {
+  const key = calendarDayKeyBR(date);
+  return dateFromCalendarDayKey(shiftCalendarDayKey(key, days))!;
+}
+
+export function weekdayFromCalendarDayKey(dayKey: string) {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
 function diasEntreChavesCalendario(fromKey: string, toKey: string) {

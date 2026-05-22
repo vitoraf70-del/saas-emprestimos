@@ -1,9 +1,8 @@
-import { recalculateOpenParcelas } from "@/actions/parcelas";
-import { prisma } from "@/lib/prisma";
-import { toCurrency } from "@/lib/utils";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDateBR } from "@/lib/date";
-import Link from "next/link";
+import { getParcelasList, PARCELAS_PAGE_SIZE } from "@/lib/queries/parcelas-list";
+import { toCurrency } from "@/lib/utils";
 
 const parcelaStatusLabel: Record<string, string> = {
   pendente: "Pendente",
@@ -11,30 +10,37 @@ const parcelaStatusLabel: Record<string, string> = {
   paga: "Paga"
 };
 
+function buildPageHref(
+  base: { nome?: string; cpf?: string; status?: string },
+  page: number
+) {
+  const params = new URLSearchParams();
+  if (base.nome) params.set("nome", base.nome);
+  if (base.cpf) params.set("cpf", base.cpf);
+  if (base.status) params.set("status", base.status);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `/parcelas?${qs}` : "/parcelas";
+}
+
 export default async function ParcelasPage({
   searchParams
 }: {
-  searchParams: { nome?: string; cpf?: string; status?: string };
+  searchParams: { nome?: string; cpf?: string; status?: string; page?: string };
 }) {
-  await recalculateOpenParcelas();
-
   const nome = searchParams.nome?.trim();
   const cpf = searchParams.cpf?.trim();
   const status = searchParams.status as "pendente" | "paga" | "vencida" | undefined;
+  const page = Number(searchParams.page ?? "1") || 1;
 
-  const parcelas = await prisma.parcela.findMany({
-    where: {
-      status: status || undefined,
-      emprestimo: {
-        cliente: {
-          nome: nome ? { contains: nome, mode: "insensitive" } : undefined,
-          cpf: cpf ? { contains: cpf } : undefined
-        }
-      }
-    },
-    include: { emprestimo: { include: { cliente: true } } },
-    orderBy: { vencimento: "asc" }
+  const { parcelas, total, totalPages, page: currentPage } = await getParcelasList({
+    nome,
+    cpf,
+    status,
+    page
   });
+
+  const filters = { nome, cpf, status };
 
   return (
     <div className="space-y-4">
@@ -65,6 +71,11 @@ export default async function ParcelasPage({
             </button>
           </form>
 
+          <p className="mb-3 text-sm text-muted-foreground">
+            {total} parcela(s) — página {currentPage} de {totalPages} (até {PARCELAS_PAGE_SIZE} por
+            página)
+          </p>
+
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-left">
@@ -94,7 +105,7 @@ export default async function ParcelasPage({
                       </Link>
                     </td>
                     <td className="p-3">{parcela.numero_parcela}</td>
-                    <td className="p-3">{formatDateBR(new Date(parcela.vencimento))}</td>
+                    <td className="p-3">{formatDateBR(parcela.vencimento)}</td>
                     <td className="p-3">
                       {toCurrency(Number(parcela.valor_atualizado || parcela.valor_original))}
                     </td>
@@ -104,6 +115,30 @@ export default async function ParcelasPage({
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 ? (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {currentPage > 1 ? (
+                <Link
+                  href={buildPageHref(filters, currentPage - 1)}
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+                >
+                  Anterior
+                </Link>
+              ) : null}
+              <span className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              {currentPage < totalPages ? (
+                <Link
+                  href={buildPageHref(filters, currentPage + 1)}
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-muted"
+                >
+                  Próxima
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

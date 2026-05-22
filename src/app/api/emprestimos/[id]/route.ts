@@ -1,7 +1,48 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { formatDateBR } from "@/lib/date";
 import { deleteEmprestimo, updateEmprestimo, type UpdateEmprestimoParcelaInput } from "@/actions/emprestimos";
+
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const emprestimo = await prisma.emprestimo.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      valor_emprestado: true,
+      valor_parcela: true,
+      cliente: { select: { nome: true } },
+      parcelas: {
+        select: {
+          id: true,
+          numero_parcela: true,
+          status: true,
+          valor_original: true,
+          vencimento: true
+        },
+        orderBy: { numero_parcela: "asc" }
+      }
+    }
+  });
+
+  if (!emprestimo) {
+    return NextResponse.json({ error: "Empréstimo não encontrado." }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    id: emprestimo.id,
+    clienteNome: emprestimo.cliente.nome,
+    valorEmprestado: Number(emprestimo.valor_emprestado),
+    valorParcela: Number(emprestimo.valor_parcela),
+    parcelas: emprestimo.parcelas.map((p) => ({
+      id: p.id,
+      numero_parcela: p.numero_parcela,
+      status: p.status,
+      valor_original: Number(p.valor_original),
+      vencimento: formatDateBR(p.vencimento)
+    }))
+  });
+}
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const exists = await prisma.emprestimo.findUnique({ where: { id: params.id }, select: { id: true } });

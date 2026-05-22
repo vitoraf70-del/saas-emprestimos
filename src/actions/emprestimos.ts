@@ -70,8 +70,16 @@ type CreateEmprestimoSimplesInput = {
   parcelasVencimentos?: string[];
 };
 
+function resolvePrimeiroVencimentoDayKey(value: string) {
+  const primeiroDayKey = extractCalendarDayKey(value);
+  if (!primeiroDayKey || !/^\d{4}-\d{2}-\d{2}$/.test(primeiroDayKey)) {
+    return null;
+  }
+  return primeiroDayKey;
+}
+
 export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInput) {
-  const primeiroDayKey = extractCalendarDayKey(input.primeiroVencimento);
+  const primeiroDayKey = resolvePrimeiroVencimentoDayKey(input.primeiroVencimento);
   if (!primeiroDayKey) {
     throw new Error("Data de vencimento inválida. Use DD/MM/AAAA.");
   }
@@ -123,7 +131,7 @@ type CreateEmprestimoPersonalizadoInput = {
 };
 
 export async function createEmprestimoPersonalizado(input: CreateEmprestimoPersonalizadoInput) {
-  const primeiroDayKey = extractCalendarDayKey(input.primeiroVencimento);
+  const primeiroDayKey = resolvePrimeiroVencimentoDayKey(input.primeiroVencimento);
   if (!primeiroDayKey) {
     throw new Error("Data de vencimento inválida. Use DD/MM/AAAA.");
   }

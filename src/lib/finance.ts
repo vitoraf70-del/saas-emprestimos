@@ -22,7 +22,7 @@ export function normalizeVencimento(date: Date) {
   return dateFromCalendarDayKey(calendarDayKeyBR(date))!;
 }
 
-/** Converte "yyyy-MM-dd" (ou Date já ancorado) para o instante usado no banco. */
+/** Converte yyyy-MM-dd para meio-dia em Campo Grande (ISO com offset fixo). */
 export function dateFromCalendarDayKey(dayKey: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey.trim());
   if (!match) return null;
@@ -30,7 +30,7 @@ export function dateFromCalendarDayKey(dayKey: string): Date | null {
   const m = Number(match[2]);
   const d = Number(match[3]);
   if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
-  return new Date(Date.UTC(y, m - 1, d, 16, 0, 0));
+  return new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00-04:00`);
 }
 
 export function shiftCalendarDayKey(dayKey: string, days: number) {

@@ -53,7 +53,7 @@ export function NovoEmprestimoPersonalizadoModal() {
       numeroParcelas: Number(data.get("numeroParcelas") ?? 0),
       valorParcela: Number(String(data.get("valorParcela") ?? "").replace(",", ".")),
       frequencia: String(data.get("frequencia") ?? "semanal"),
-      primeiroVencimento: String(data.get("primeiroVencimento") ?? "")
+      primeiroVencimento: primeiroVencimento
     };
 
     const response = await fetch("/api/emprestimos/personalizado", {
@@ -169,10 +169,10 @@ export function NovoEmprestimoPersonalizadoModal() {
               <option value="diario">Diário (segunda a sábado, sem domingo)</option>
             </select>
 
+            <input type="hidden" name="primeiroVencimento" value={primeiroVencimento} readOnly />
             <input
               type="date"
               required
-              name="primeiroVencimento"
               value={primeiroVencimento}
               onChange={(e) => setPrimeiroVencimento(e.target.value)}
               className="rounded-md border p-2"

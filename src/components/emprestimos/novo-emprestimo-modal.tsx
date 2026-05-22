@@ -42,7 +42,7 @@ export function NovoEmprestimoModal() {
       clienteId: String(data.get("clienteId") ?? ""),
       valor: Number(data.get("valor") ?? 0),
       numeroParcelas: Number(data.get("numeroParcelas") ?? 0),
-      primeiroVencimento: String(data.get("primeiroVencimento") ?? "")
+      primeiroVencimento: primeiroVencimento
     };
 
     const response = await fetch("/api/emprestimos", {
@@ -122,10 +122,10 @@ export function NovoEmprestimoModal() {
               ))}
             </select>
 
+            <input type="hidden" name="primeiroVencimento" value={primeiroVencimento} readOnly />
             <input
               type="date"
               required
-              name="primeiroVencimento"
               value={primeiroVencimento}
               onChange={(e) => setPrimeiroVencimento(e.target.value)}
               className="rounded-md border p-2"

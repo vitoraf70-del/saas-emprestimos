@@ -7,7 +7,7 @@ const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
 export async function getDashboardData() {
   const [
     emprestadoAgg,
-    recebidoAgg,
+    recebidoParcelasAgg,
     aReceberAgg,
     parcelasVencidas,
     atrasoAgg,
@@ -15,9 +15,9 @@ export async function getDashboardData() {
     clientes
   ] = await Promise.all([
     prisma.emprestimo.aggregate({ _sum: { valor_emprestado: true } }),
-    prisma.pagamento.aggregate({
-      where: { status: "confirmado" },
-      _sum: { valor_pago: true }
+    prisma.parcela.aggregate({
+      where: { status: "paga" },
+      _sum: { valor_atualizado: true }
     }),
     prisma.parcela.aggregate({
       where: { status: { not: "paga" } },
@@ -36,7 +36,7 @@ export async function getDashboardData() {
   ]);
 
   const totalEmprestado = toNumber(emprestadoAgg._sum.valor_emprestado);
-  const totalRecebido = toNumber(recebidoAgg._sum.valor_pago);
+  const totalRecebido = toNumber(recebidoParcelasAgg._sum.valor_atualizado);
   const totalAReceber = toNumber(aReceberAgg._sum.valor_atualizado);
   const lucroTotal = totalRecebido - totalEmprestado;
   const lucroPercentual = totalEmprestado ? (lucroTotal / totalEmprestado) * 100 : 0;

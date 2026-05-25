@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { revalidateAppAfterPayment } from "@/lib/revalidate-app";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { toCurrency } from "@/lib/utils";
 
@@ -119,5 +120,6 @@ export async function confirmPagamentoByTxid(
   });
 
   await notificarClientePagamento(targetIds, valorPagamento);
+  revalidateAppAfterPayment();
   return true;
 }

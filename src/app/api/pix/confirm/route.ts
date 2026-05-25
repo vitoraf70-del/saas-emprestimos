@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
+import { revalidateAppAfterPayment } from "@/lib/revalidate-app";
 import { toCurrency } from "@/lib/utils";
 
 export async function POST(request: Request) {
@@ -37,6 +38,8 @@ export async function POST(request: Request) {
     });
     await syncEmprestimoStatus(parcela.emprestimo_id, tx);
   });
+
+  revalidateAppAfterPayment();
 
   await sendWhatsAppMessage({
     phone: parcela.emprestimo.cliente.whatsapp,

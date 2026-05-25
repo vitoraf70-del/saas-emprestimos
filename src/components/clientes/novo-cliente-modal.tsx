@@ -4,46 +4,54 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  const ddd = digits.slice(0, 2);
-  const first = digits.slice(2, 7);
-  const second = digits.slice(7, 11);
-
-  if (!ddd) return "";
-  if (digits.length <= 2) return `(${ddd}`;
-  if (digits.length <= 7) return `(${ddd}) ${first}`;
-  return `(${ddd}) ${first}-${second}`;
-}
+import { formatBrazilPhone, normalizeBrazilPhone } from "@/lib/utils";
 
 export function NovoClienteModal() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [whatsApp, setWhatsApp] = useState("");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    setError("");
 
     const form = event.currentTarget;
     const data = new FormData(form);
-    const payload = Object.fromEntries(data.entries());
+    const payload = Object.fromEntries(data.entries()) as Record<string, string>;
 
-    const response = await fetch("/api/clientes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const whatsappNormalizado = normalizeBrazilPhone(payload.whatsapp ?? whatsApp);
+    if (!whatsappNormalizado) {
+      setLoading(false);
+      setError("WhatsApp inválido. Digite os 11 números, ex.: (67) 99999-9999.");
+      return;
+    }
+    payload.whatsapp = whatsappNormalizado;
 
-    setLoading(false);
-    if (!response.ok) return;
+    try {
+      const response = await fetch("/api/clientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    setOpen(false);
-    setWhatsApp("");
-    form.reset();
-    router.refresh();
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? "Não foi possível salvar o cliente.");
+        return;
+      }
+
+      setOpen(false);
+      setWhatsApp("");
+      form.reset();
+      router.refresh();
+    } catch {
+      setError("Erro de conexão. Verifique a internet e tente de novo.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -68,15 +76,19 @@ export function NovoClienteModal() {
               placeholder="(67) 99999-9999"
               className="rounded-md border p-2"
               value={whatsApp}
-              onChange={(e) => setWhatsApp(formatPhone(e.target.value))}
+              onChange={(e) => setWhatsApp(formatBrazilPhone(e.target.value))}
               inputMode="numeric"
-              pattern="\(\d{2}\)\s\d{5}-\d{4}"
-              title="Use o formato (67) 99999-9999"
+              title="Digite DDD + número com 9 dígitos"
             />
             <input name="referencia1_nome" placeholder="Referência 1 (nome)" className="rounded-md border p-2" />
             <input name="referencia1_telefone" placeholder="Referência 1 (telefone)" className="rounded-md border p-2" />
             <input name="referencia2_nome" placeholder="Referência 2 (nome)" className="rounded-md border p-2" />
             <input name="referencia2_telefone" placeholder="Referência 2 (telefone)" className="rounded-md border p-2" />
+            {error ? (
+              <p className="md:col-span-2 text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            ) : null}
             <Button type="submit" className="md:col-span-2" disabled={loading}>
               {loading ? "Salvando..." : "Salvar cliente"}
             </Button>

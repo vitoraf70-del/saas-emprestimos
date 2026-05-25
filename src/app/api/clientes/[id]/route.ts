@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteCliente, updateCliente } from "@/actions/clientes";
+import { normalizeBrazilPhone } from "@/lib/utils";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const body = await request.json();
-  const phonePattern = /^\(\d{2}\)\s\d{5}-\d{4}$/;
+  const whatsapp = normalizeBrazilPhone(String(body.whatsapp ?? ""));
 
-  if (!phonePattern.test(String(body.whatsapp ?? ""))) {
+  if (!whatsapp) {
     return NextResponse.json(
-      { error: "WhatsApp inválido. Use o formato (67) 99999-9999." },
+      { error: "WhatsApp inválido. Use 11 dígitos, ex.: (67) 99999-9999." },
       { status: 400 }
     );
   }
@@ -30,7 +31,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     nome: String(body.nome ?? ""),
     cpf,
     endereco: String(body.endereco ?? ""),
-    whatsapp: String(body.whatsapp ?? ""),
+    whatsapp,
     referencia1_nome:
       "referencia1_nome" in body ? (String(body.referencia1_nome ?? "").trim() || null) : undefined,
     referencia1_telefone:

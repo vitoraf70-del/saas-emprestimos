@@ -8,6 +8,7 @@ const items = [
   { href: "/clientes", label: "Clientes" },
   { href: "/emprestimos", label: "Empréstimos" },
   { href: "/parcelas", label: "Parcelas" },
+  { href: "/despesas", label: "Despesas" },
   { href: "/relatorios", label: "Relatórios" }
 ];
 

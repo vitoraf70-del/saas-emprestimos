@@ -13,10 +13,9 @@ export function useClientesOptions() {
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (clientes.length > 0) return clientes;
     setLoading(true);
     try {
-      const response = await fetch("/api/clientes/options");
+      const response = await fetch("/api/clientes/options", { cache: "no-store" });
       if (!response.ok) throw new Error("Falha ao carregar clientes");
       const data = (await response.json()) as ClienteOption[];
       setClientes(data);
@@ -24,7 +23,7 @@ export function useClientesOptions() {
     } finally {
       setLoading(false);
     }
-  }, [clientes.length]);
+  }, []);
 
   return { clientes, loading, load };
 }

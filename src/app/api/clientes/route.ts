@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     });
 
     revalidatePath("/clientes");
+    revalidatePath("/emprestimos");
     return NextResponse.json(cliente, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

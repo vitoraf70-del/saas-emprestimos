@@ -72,14 +72,17 @@ async function sendByZapi({ phone, message }: SendWhatsAppInput) {
   }
 }
 
-function normalizePhone(phone: string) {
+export function normalizeWhatsAppDigits(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10) {
     throw new Error("Telefone WhatsApp inválido");
   }
-  // Converts common BR formats to E.164 digits-only expected by providers.
   if (digits.startsWith("55")) return digits;
   return `55${digits}`;
+}
+
+function normalizePhone(phone: string) {
+  return normalizeWhatsAppDigits(phone);
 }
 
 async function safeResponseText(response: Response) {

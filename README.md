@@ -75,3 +75,4 @@ vercel.json
 - Configure domínio e variáveis na Vercel.
 - Cron de cobrança (`vercel.json`), fuso `America/Campo_Grande`: **19:00** (antecipados); **14:00**, **20:00**, **23:40** (vencimento). UTC: `0 23`, `0 18`, `0 0`, `40 3`. Muitos clientes: envio **paralelo** (`COBRANCA_CONCURRENCY`) e **continuação automática** até esvaziar a fila (resposta HTTP rápida para o cron-job.org). No **Hobby**, use [cron-job.org](https://cron-job.org): `GET .../api/cron/cobrancas?secret=CRON_SECRET`. Defina `NEXT_PUBLIC_APP_URL` para a continuação funcionar.
 - Configure Evolution API ou Z-API (`WHATSAPP_PROVIDER`) para o robô enviar mensagens.
+- **Agente WhatsApp (cadastro + consultas):** webhook `POST https://SEU_DOMINIO/api/webhooks/whatsapp?secret=WHATSAPP_WEBHOOK_SECRET` (Evolution: evento `messages.upsert`; Z-API: `ReceivedCallback`). Comandos: `cadastro`, `pagar`, `saldo`, `menu`. Coleta ocupação (comerciante, motorista de app, etc.).

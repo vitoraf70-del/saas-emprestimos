@@ -24,6 +24,14 @@ enum MetodoPagamento {
   pix
 }
 
+enum TipoOcupacao {
+  comerciante
+  motorista_app
+  autonomo
+  funcionario_clt
+  outro
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -73,17 +81,29 @@ model VerificationToken {
 }
 
 model Cliente {
-  id                  String       @id @default(cuid())
+  id                  String        @id @default(cuid())
   nome                String
-  cpf                 String       @unique
+  cpf                 String        @unique
   endereco            String
   whatsapp            String
+  tipo_ocupacao       TipoOcupacao?
+  ocupacao_detalhe    String?
+  origem_cadastro     String?
   referencia1_nome    String?
   referencia1_telefone String?
   referencia2_nome    String?
   referencia2_telefone String?
-  created_at          DateTime     @default(now())
+  created_at          DateTime      @default(now())
   emprestimos         Emprestimo[]
+}
+
+model WhatsappConversa {
+  id         String   @id @default(cuid())
+  telefone   String   @unique
+  etapa      String
+  dados      Json     @default("{}")
+  updated_at DateTime @updatedAt
+  created_at DateTime @default(now())
 }
 
 model Emprestimo {

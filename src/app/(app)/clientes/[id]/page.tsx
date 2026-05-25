@@ -8,6 +8,7 @@ import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-butt
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { formatDateBR } from "@/lib/date";
 import { buildPagarLink, buildPagarLinkWithCpf, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
+import { labelOcupacao } from "@/lib/ocupacao";
 import { toCurrency } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 
@@ -76,7 +77,16 @@ export default async function ClienteDetalhePage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-2xl font-bold">{cliente.nome}</h2>
+        <div>
+          <h2 className="text-2xl font-bold">{cliente.nome}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            CPF {cliente.cpf} · {cliente.whatsapp}
+            {cliente.tipo_ocupacao
+              ? ` · ${labelOcupacao(cliente.tipo_ocupacao, cliente.ocupacao_detalhe)}`
+              : ""}
+            {cliente.origem_cadastro === "whatsapp" ? " · Cadastro via WhatsApp" : ""}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <EditarClienteModal cliente={cliente} />
           <ExcluirClienteButton

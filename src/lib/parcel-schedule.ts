@@ -3,6 +3,7 @@ import {
   anchorVencimentoCampoGrande,
   calendarDayKeyBR,
   dateFromCalendarDayKey,
+  diasEntreCalendarioBR,
   shiftCalendarDayKey,
   weekdayFromCalendarDayKey
 } from "@/lib/finance";
@@ -53,6 +54,15 @@ function buildDailyInstallmentDueDatesMonSat(primeiroVencimento: Date, quantidad
  * Cada parcela seguinte = data anterior + 7 dias (mesmo dia da semana).
  */
 export type FrequenciaParcela = "diario" | "semanal";
+
+/** Infere diário quando intervalo entre as 2 primeiras parcelas é 1–2 dias (pula domingo). */
+export function inferFrequenciaParcela(vencimentos: Date[]): FrequenciaParcela {
+  if (vencimentos.length < 2) return "semanal";
+  const sorted = [...vencimentos].sort((a, b) => a.getTime() - b.getTime());
+  const gap = diasEntreCalendarioBR(sorted[1], sorted[0]);
+  if (gap >= 1 && gap <= 2) return "diario";
+  return "semanal";
+}
 
 export function buildWeeklyInstallmentDueDates(primeiroVencimento: Date, quantidade: number): Date[] {
   return buildInstallmentDueDates(primeiroVencimento, quantidade, "semanal");

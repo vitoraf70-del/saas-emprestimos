@@ -11,7 +11,7 @@ import {
   isSameCalendarDayBR,
   shiftCalendarDayKey
 } from "@/lib/finance";
-import { isDomingo } from "@/lib/parcel-schedule";
+import { type FrequenciaParcela, isDomingo } from "@/lib/parcel-schedule";
 import { formatDateBR } from "@/lib/date";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
@@ -97,7 +97,8 @@ function detectarFase(
   avisosAntecipados: number,
   avisosVencimento: number,
   ultimoAviso: Date | null,
-  hoje: Date
+  hoje: Date,
+  frequenciaParcela: FrequenciaParcela
 ): { fase: FaseCobranca | null; motivo?: string } {
   if (diasAtrasoValor > 0) {
     if (ultimoAviso && isSameCalendarDayBR(ultimoAviso, hoje)) {
@@ -108,6 +109,12 @@ function detectarFase(
 
   if (isDomingo(hoje)) {
     return { fase: null, motivo: "domingo: cobrança só em atraso (multa/juros continuam)" };
+  }
+
+  if (diasParaVencerValor === 2 || diasParaVencerValor === 1) {
+    if (frequenciaParcela === "diario") {
+      return { fase: null, motivo: "diário: sem aviso antecipado (só no dia do vencimento)" };
+    }
   }
 
   if (diasParaVencerValor === 2) {
@@ -191,7 +198,14 @@ async function carregarParcelasAbertas(hoje: Date) {
       status: { in: ["pendente", "vencida"] },
       vencimento: vencimentoRangeBR(hoje)
     },
-    include: { emprestimo: { include: { cliente: true } } },
+    include: {
+      emprestimo: {
+        select: {
+          frequencia_parcela: true,
+          cliente: true
+        }
+      }
+    },
     orderBy: { vencimento: "asc" }
   });
 }
@@ -310,7 +324,8 @@ export async function processarCobrancaAutomatica(
       parcela.avisos_antecipados,
       parcela.avisos_vencimento,
       parcela.ultimo_aviso_em,
-      hoje
+      hoje,
+      parcela.emprestimo.frequencia_parcela
     );
 
     if (!fase) {
@@ -363,7 +378,8 @@ export async function contarCobrancasPendentes(): Promise<number> {
       parcela.avisos_antecipados,
       parcela.avisos_vencimento,
       parcela.ultimo_aviso_em,
-      hoje
+      hoje,
+      parcela.emprestimo.frequencia_parcela
     );
     if (fase) pendentes++;
   }

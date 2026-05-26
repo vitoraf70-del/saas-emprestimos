@@ -73,6 +73,10 @@ export function weekdayFromCalendarDayKey(dayKey: string) {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
+export function diasEntreCalendarioBR(a: Date, b: Date) {
+  return diasEntreChavesCalendario(calendarDayKeyBR(a), calendarDayKeyBR(b));
+}
+
 function diasEntreChavesCalendario(fromKey: string, toKey: string) {
   const [y1, m1, d1] = fromKey.split("-").map(Number);
   const [y2, m2, d2] = toKey.split("-").map(Number);

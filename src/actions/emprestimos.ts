@@ -94,7 +94,8 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
         numero_parcelas: input.numeroParcelas,
         valor_parcela: valorParcela,
         data_inicio: new Date(),
-        vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey)
+        vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey),
+        frequencia_parcela: "semanal"
       }
     });
 
@@ -158,7 +159,8 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
         data_inicio: new Date(),
         vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey),
         multa_percentual: 0,
-        juros_dia_percentual: 0
+        juros_dia_percentual: 0,
+        frequencia_parcela: input.frequencia
       }
     });
 

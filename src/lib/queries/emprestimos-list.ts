@@ -24,6 +24,15 @@ export type EmprestimosListFilters = {
   status?: StatusEmprestimo;
 };
 
+function sortByProximoVencimento<T extends { proximoVencimento: Date | null }>(rows: T[]) {
+  return [...rows].sort((a, b) => {
+    if (!a.proximoVencimento && !b.proximoVencimento) return 0;
+    if (!a.proximoVencimento) return 1;
+    if (!b.proximoVencimento) return -1;
+    return a.proximoVencimento.getTime() - b.proximoVencimento.getTime();
+  });
+}
+
 function buildWhere(filters: EmprestimosListFilters): Prisma.EmprestimoWhereInput {
   const nome = filters.nome?.trim();
 
@@ -48,10 +57,7 @@ export async function getEmprestimosList(filters: EmprestimosListFilters = {}) {
         numero_parcelas: true,
         status: true,
         cliente: { select: { nome: true } }
-      },
-      orderBy: { created_at: "desc" },
-      take: EMPRESTIMOS_PAGE_SIZE,
-      skip
+      }
     }),
     prisma.emprestimo.count({ where })
   ]);
@@ -101,7 +107,7 @@ export async function getEmprestimosList(filters: EmprestimosListFilters = {}) {
     statsPorEmprestimo.set(row.emprestimo_id, current);
   }
 
-  const rows: EmprestimoListRow[] = emprestimos.map((e) => {
+  const allRows: EmprestimoListRow[] = emprestimos.map((e) => {
     const stats = statsPorEmprestimo.get(e.id) ?? { pagas: 0, emAberto: 0 };
     return {
       id: e.id,
@@ -115,6 +121,8 @@ export async function getEmprestimosList(filters: EmprestimosListFilters = {}) {
       proximoVencimento: proximoPorEmprestimo.get(e.id) ?? null
     };
   });
+
+  const rows = sortByProximoVencimento(allRows).slice(skip, skip + EMPRESTIMOS_PAGE_SIZE);
 
   return {
     rows,

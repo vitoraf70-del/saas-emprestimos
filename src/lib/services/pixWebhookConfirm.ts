@@ -90,34 +90,44 @@ export async function confirmPagamentoByTxid(
     return false;
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.pagamento.update({
-      where: { id: pagamento.id },
-      data: {
-        status: "confirmado",
-        data_pagamento: new Date()
-      }
-    });
-
-    for (const p of parcelas) {
-      await tx.parcela.update({
-        where: { id: p.id },
-        data: {
-          status: "paga",
-          data_pagamento: new Date(),
-          dias_atraso: 0,
-          multa_valor: 0,
-          juros_valor: 0,
-          valor_atualizado: p.valor_original
-        }
-      });
-    }
-
-    const emprestimoIds = [...new Set(parcelas.map((p) => p.emprestimo_id))];
-    for (const emprestimoId of emprestimoIds) {
-      await syncEmprestimoStatus(emprestimoId, tx);
+  // Só uma requisição concurrente (webhook + poll + cron) pode confirmar e notificar.
+  const claimed = await prisma.pagamento.updateMany({
+    where: { id: pagamento.id, status: "pendente" },
+    data: {
+      status: "confirmado",
+      data_pagamento: new Date()
     }
   });
+  if (claimed.count === 0) return false;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const p of parcelas) {
+        await tx.parcela.update({
+          where: { id: p.id },
+          data: {
+            status: "paga",
+            data_pagamento: new Date(),
+            dias_atraso: 0,
+            multa_valor: 0,
+            juros_valor: 0,
+            valor_atualizado: p.valor_original
+          }
+        });
+      }
+
+      const emprestimoIds = [...new Set(parcelas.map((p) => p.emprestimo_id))];
+      for (const emprestimoId of emprestimoIds) {
+        await syncEmprestimoStatus(emprestimoId, tx);
+      }
+    });
+  } catch (error) {
+    await prisma.pagamento.updateMany({
+      where: { id: pagamento.id, status: "confirmado" },
+      data: { status: "pendente", data_pagamento: pagamento.data_pagamento }
+    });
+    throw error;
+  }
 
   await notificarClientePagamento(targetIds, valorPagamento);
   revalidateAppAfterPayment();

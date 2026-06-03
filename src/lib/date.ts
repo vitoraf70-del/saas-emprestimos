@@ -1,10 +1,9 @@
-import { format, isValid } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { isValid } from "date-fns";
 import {
   calendarDayKeyBR,
   dateFromCalendarDayKey,
   extractCalendarDayKey,
-  weekdayFromCalendarDayKey
+  weekdayLabelFromCalendarDayKey
 } from "@/lib/finance";
 
 export function formatDateBR(date: Date) {
@@ -17,15 +16,8 @@ export function formatDateBR(date: Date) {
 export function formatDateWithWeekdayBR(date: Date) {
   if (!date || !isValid(date)) return "—";
   const key = calendarDayKeyBR(date);
-  const anchored = dateFromCalendarDayKey(key);
-  if (!anchored) return "—";
-  const weekday = weekdayFromCalendarDayKey(key);
-  const weekdayLabel = format(
-    new Date(Date.UTC(2024, 0, 7 + weekday)),
-    "EEEE",
-    { locale: ptBR }
-  );
-  return `${formatDateBR(date)} (${weekdayLabel})`;
+  if (!dateFromCalendarDayKey(key)) return "—";
+  return `${formatDateBR(date)} (${weekdayLabelFromCalendarDayKey(key)})`;
 }
 
 export function parseDateFromInput(value: string) {

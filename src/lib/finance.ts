@@ -77,9 +77,24 @@ export function addCalendarDays(date: Date, days: number): Date {
   return dateFromCalendarDayKey(shiftCalendarDayKey(key, days))!;
 }
 
+const WEEKDAY_LABELS_PT = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado"
+] as const;
+
 export function weekdayFromCalendarDayKey(dayKey: string) {
   const [y, m, d] = dayKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** Nome do dia da semana a partir de yyyy-MM-dd (calendário, sem fuso). */
+export function weekdayLabelFromCalendarDayKey(dayKey: string) {
+  return WEEKDAY_LABELS_PT[weekdayFromCalendarDayKey(dayKey)];
 }
 
 export function diasEntreCalendarioBR(a: Date, b: Date) {

@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDateWithWeekdayBR } from "@/lib/date";
-import { JUROS_DIA_FIXO, MULTA_ATRASO_FIXA, tomorrowCalendarDayKeyBR } from "@/lib/finance";
+import {
+  JUROS_DIA_DIARIO,
+  JUROS_DIA_SEMANAL,
+  MULTA_ATRASO_SEMANAL,
+  tomorrowCalendarDayKeyBR
+} from "@/lib/finance";
 import { buildInstallmentDueDatesFromDayKey } from "@/lib/parcel-schedule";
 import { toCurrency } from "@/lib/utils";
 import { useClientesOptions } from "@/components/emprestimos/use-clientes-options";
@@ -193,9 +198,18 @@ export function NovoEmprestimoPersonalizadoModal() {
             </p>
 
             <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-              Vencimento diário: segunda a sábado (domingo não entra na grade de cobrança).
-              Em atraso, multa de {toCurrency(MULTA_ATRASO_FIXA)} + {toCurrency(JUROS_DIA_FIXO)} por dia
-              corre inclusive aos domingos.
+              {frequencia === "diario" ? (
+                <>
+                  Vencimento diário: segunda a sábado (domingo não entra na grade de cobrança). Em atraso,{" "}
+                  {toCurrency(JUROS_DIA_DIARIO)} por dia (ex.: 2 dias = {toCurrency(JUROS_DIA_DIARIO * 2)}).
+                  Juros continuam correndo inclusive aos domingos.
+                </>
+              ) : (
+                <>
+                  Em atraso, multa de {toCurrency(MULTA_ATRASO_SEMANAL)} + {toCurrency(JUROS_DIA_SEMANAL)} por dia
+                  de juros.
+                </>
+              )}
             </p>
 
             {error ? <p className="text-sm text-red-600">{error}</p> : null}

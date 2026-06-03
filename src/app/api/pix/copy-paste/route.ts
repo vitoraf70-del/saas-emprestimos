@@ -20,7 +20,11 @@ export async function POST(request: Request) {
     }
 
     const atraso = diasAtraso(parcela.vencimento);
-    const calc = calcularParcelaAtualizada(Number(parcela.valor_original), atraso);
+    const calc = calcularParcelaAtualizada(
+      Number(parcela.valor_original),
+      atraso,
+      parcela.emprestimo.frequencia_parcela
+    );
     const updated = await prisma.parcela.update({
       where: { id: parcela.id },
       data: {

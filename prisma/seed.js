@@ -8,13 +8,13 @@ const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "Agiota70Afonso67";
 async function main() {
   const passwordHash = await hash(ADMIN_PASSWORD, 10);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@loanerp.com" },
+    where: { email: "vitoraf70@gmail.com" },
     update: {
       passwordHash
     },
     create: {
-      email: "admin@loanerp.com",
-      name: "Administrador",
+      email: "vitoraf70@gmail.com",
+      name: "Vitor",
       passwordHash
     }
   });

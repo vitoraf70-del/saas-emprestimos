@@ -33,7 +33,11 @@ export async function POST(request: Request) {
     const atualizadas = await prisma.$transaction(
       parcelas.map((parcela) => {
         const atraso = diasAtraso(parcela.vencimento);
-        const calc = calcularParcelaAtualizada(Number(parcela.valor_original), atraso);
+        const calc = calcularParcelaAtualizada(
+          Number(parcela.valor_original),
+          atraso,
+          parcela.emprestimo.frequencia_parcela
+        );
         return prisma.parcela.update({
           where: { id: parcela.id },
           data: {

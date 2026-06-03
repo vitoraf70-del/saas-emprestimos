@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { recalculateOpenParcelasData } from "@/lib/services/parcelas-recalculo";
 
 export async function recalculateParcela(parcelaId: string) {
   const parcela = await prisma.parcela.findUnique({
@@ -12,7 +13,11 @@ export async function recalculateParcela(parcelaId: string) {
   if (!parcela) throw new Error("Parcela não encontrada");
 
   const dias = diasAtraso(parcela.vencimento);
-  const result = calcularParcelaAtualizada(Number(parcela.valor_original), dias);
+  const result = calcularParcelaAtualizada(
+    Number(parcela.valor_original),
+    dias,
+    parcela.emprestimo.frequencia_parcela
+  );
 
   const updated = await prisma.parcela.update({
     where: { id: parcelaId },
@@ -31,35 +36,5 @@ export async function recalculateParcela(parcelaId: string) {
 }
 
 export async function recalculateOpenParcelas() {
-  const hoje = new Date();
-  const parcelas = await prisma.parcela.findMany({
-    where: { status: { in: ["pendente", "vencida"] } },
-    select: {
-      id: true,
-      status: true,
-      valor_original: true,
-      vencimento: true,
-      emprestimo_id: true
-    }
-  });
-
-  await Promise.all(
-    parcelas.map((parcela) => {
-      const dias = diasAtraso(parcela.vencimento, hoje);
-      const result = calcularParcelaAtualizada(Number(parcela.valor_original), dias);
-      return prisma.parcela.update({
-        where: { id: parcela.id },
-        data: {
-          dias_atraso: result.diasAtraso,
-          multa_valor: result.multaValor,
-          juros_valor: result.jurosValor,
-          valor_atualizado: result.valorAtualizado,
-          status: result.diasAtraso > 0 ? "vencida" : "pendente"
-        }
-      });
-    })
-  );
-
-  const emprestimoIds = await prisma.emprestimo.findMany({ select: { id: true } });
-  await Promise.all(emprestimoIds.map(({ id }) => syncEmprestimoStatus(id)));
+  await recalculateOpenParcelasData();
 }

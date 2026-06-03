@@ -68,7 +68,8 @@ export async function confirmPagamentoByTxid(
   const targetIds = parcelaIds.length > 0 ? parcelaIds : [pagamento.parcela_id];
 
   const parcelas = await prisma.parcela.findMany({
-    where: { id: { in: targetIds } }
+    where: { id: { in: targetIds } },
+    include: { emprestimo: { select: { frequencia_parcela: true } } }
   });
   if (parcelas.length === 0) return false;
 
@@ -79,7 +80,11 @@ export async function confirmPagamentoByTxid(
     let sum = 0;
     for (const p of parcelas) {
       const atraso = diasAtraso(p.vencimento);
-      const calc = calcularParcelaAtualizada(Number(p.valor_original), atraso);
+      const calc = calcularParcelaAtualizada(
+        Number(p.valor_original),
+        atraso,
+        p.emprestimo.frequencia_parcela
+      );
       sum += calc.valorAtualizado;
     }
     const valorCob = cob.valorOriginal ?? sum;

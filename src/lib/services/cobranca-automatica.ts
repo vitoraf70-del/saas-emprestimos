@@ -314,7 +314,11 @@ export async function processarCobrancaAutomatica(
     resultado.processadas++;
     const diasAtrasoValor = diasAtraso(parcela.vencimento, hoje);
     const diasParaVencerValor = diasParaVencer(parcela.vencimento, hoje);
-    const calc = calcularParcelaAtualizada(Number(parcela.valor_original), diasAtrasoValor);
+    const calc = calcularParcelaAtualizada(
+      Number(parcela.valor_original),
+      diasAtrasoValor,
+      parcela.emprestimo.frequencia_parcela
+    );
 
     await atualizarCalculoParcela(parcela, hoje, diasAtrasoValor, calc);
 

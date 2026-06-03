@@ -40,10 +40,14 @@ export default async function PagarPage({
     : null;
 
   const parcelas = (cliente?.emprestimos ?? [])
-    .flatMap((e) => e.parcelas)
-    .map((p) => {
+    .flatMap((e) => e.parcelas.map((p) => ({ parcela: p, emprestimo: e })))
+    .map(({ parcela: p, emprestimo: e }) => {
       const atraso = diasAtraso(new Date(p.vencimento), new Date());
-      const calc = calcularParcelaAtualizada(Number(p.valor_original), atraso);
+      const calc = calcularParcelaAtualizada(
+        Number(p.valor_original),
+        atraso,
+        e.frequencia_parcela
+      );
       return { parcela: p, calc };
     });
   const totalQuitacao = parcelas.reduce((acc, item) => acc + item.calc.valorAtualizado, 0);

@@ -1,7 +1,16 @@
-/** Multa fixa por parcela em atraso (R$). */
-export const MULTA_ATRASO_FIXA = 50;
-/** Mora diária por parcela em atraso (R$/dia). */
-export const JUROS_DIA_FIXO = 20;
+import type { FrequenciaParcela } from "@/lib/parcel-schedule";
+
+/** Multa fixa por parcela em atraso — empréstimo semanal (R$). */
+export const MULTA_ATRASO_SEMANAL = 50;
+/** Mora diária — empréstimo semanal (R$/dia). */
+export const JUROS_DIA_SEMANAL = 20;
+/** Mora diária — empréstimo diário (R$/dia), sem multa fixa. */
+export const JUROS_DIA_DIARIO = 30;
+
+/** @deprecated Use MULTA_ATRASO_SEMANAL */
+export const MULTA_ATRASO_FIXA = MULTA_ATRASO_SEMANAL;
+/** @deprecated Use JUROS_DIA_SEMANAL */
+export const JUROS_DIA_FIXO = JUROS_DIA_SEMANAL;
 
 const DAILY_MS = 1000 * 60 * 60 * 24;
 /** Campo Grande (MS) — UTC−4 */
@@ -103,7 +112,22 @@ export function isSameCalendarDayBR(a: Date, b: Date) {
   return calendarDayKeyBR(a) === calendarDayKeyBR(b);
 }
 
-export function calcularParcelaAtualizada(valorOriginal: number, dias: number) {
+export function encargosAtraso(dias: number, frequencia: FrequenciaParcela = "semanal") {
+  if (dias <= 0) return { multaValor: 0, jurosValor: 0 };
+  if (frequencia === "diario") {
+    return { multaValor: 0, jurosValor: JUROS_DIA_DIARIO * dias };
+  }
+  return {
+    multaValor: MULTA_ATRASO_SEMANAL,
+    jurosValor: JUROS_DIA_SEMANAL * dias
+  };
+}
+
+export function calcularParcelaAtualizada(
+  valorOriginal: number,
+  dias: number,
+  frequencia: FrequenciaParcela = "semanal"
+) {
   if (dias <= 0) {
     return {
       diasAtraso: 0,
@@ -113,8 +137,7 @@ export function calcularParcelaAtualizada(valorOriginal: number, dias: number) {
     };
   }
 
-  const multaValor = MULTA_ATRASO_FIXA;
-  const jurosValor = JUROS_DIA_FIXO * dias;
+  const { multaValor, jurosValor } = encargosAtraso(dias, frequencia);
   const valorAtualizado = valorOriginal + multaValor + jurosValor;
 
   return {

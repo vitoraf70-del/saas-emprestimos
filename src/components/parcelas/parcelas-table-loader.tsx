@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDateBR } from "@/lib/date";
+import { recalculateOpenParcelasData } from "@/lib/services/parcelas-recalculo";
 import {
   getParcelasResumoList,
   labelSituacaoParcelas,
@@ -32,6 +33,7 @@ export async function ParcelasTableLoader({
   status?: "pendente" | "paga" | "vencida";
   page: number;
 }) {
+  await recalculateOpenParcelasData();
   const list = await getParcelasResumoList({ nome, cpf, status, page });
   const filters = { nome, cpf, status };
 

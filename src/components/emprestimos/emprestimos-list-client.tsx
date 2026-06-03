@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EditarEmprestimoModal } from "@/components/emprestimos/editar-emprestimo-modal";
+import { RenovarEmprestimoModal } from "@/components/emprestimos/renovar-emprestimo-modal";
 import { formatDateBR } from "@/lib/date";
 import type { EmprestimoListRow } from "@/lib/queries/emprestimos-list";
 import { EMPRESTIMOS_PAGE_SIZE } from "@/lib/queries/emprestimos-list";
@@ -42,6 +43,13 @@ export function EmprestimosListClient({
   filters
 }: Props) {
   const [editTarget, setEditTarget] = useState<{ id: string; nome: string } | null>(null);
+  const [renewTarget, setRenewTarget] = useState<{
+    id: string;
+    nome: string;
+    valorEmprestado: number;
+    valorParcela: number;
+    numeroParcelas: number;
+  } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     nome: string;
@@ -136,6 +144,22 @@ export function EmprestimosListClient({
                         type="button"
                         variant="outline"
                         size="sm"
+                        onClick={() =>
+                          setRenewTarget({
+                            id: e.id,
+                            nome: e.clienteNome,
+                            valorEmprestado: e.valorEmprestado,
+                            valorParcela: e.valorParcela,
+                            numeroParcelas: e.numeroParcelas
+                          })
+                        }
+                      >
+                        Renovar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setEditTarget({ id: e.id, nome: e.clienteNome })}
                       >
                         Editar
@@ -195,6 +219,18 @@ export function EmprestimosListClient({
           clienteNome={editTarget.nome}
           open
           onClose={() => setEditTarget(null)}
+        />
+      ) : null}
+
+      {renewTarget ? (
+        <RenovarEmprestimoModal
+          emprestimoId={renewTarget.id}
+          clienteNome={renewTarget.nome}
+          valorEmprestadoInicial={renewTarget.valorEmprestado}
+          valorParcelaInicial={renewTarget.valorParcela}
+          numeroParcelasInicial={renewTarget.numeroParcelas}
+          open
+          onClose={() => setRenewTarget(null)}
         />
       ) : null}
 

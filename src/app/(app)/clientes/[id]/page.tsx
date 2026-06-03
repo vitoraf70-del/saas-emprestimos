@@ -7,6 +7,7 @@ import { EditarClienteModal } from "@/components/clientes/editar-cliente-modal";
 import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-button";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { formatDateBR } from "@/lib/date";
+import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
 import { buildPagarLink, buildPagarLinkWithCpf, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { labelOcupacao } from "@/lib/ocupacao";
 import { toCurrency } from "@/lib/utils";
@@ -32,8 +33,63 @@ export default async function ClienteDetalhePage({
   });
   if (!cliente) return notFound();
 
+  const updates = cliente.emprestimos.flatMap((emprestimo) =>
+    emprestimo.parcelas.flatMap((parcela) => {
+      if (parcela.status === "paga") return [];
+        const dias = diasAtraso(new Date(parcela.vencimento));
+        const calc = calcularParcelaAtualizada(
+          Number(parcela.valor_original),
+          dias,
+          emprestimo.frequencia_parcela
+        );
+        const novoStatus = calc.diasAtraso > 0 ? "vencida" : "pendente";
+        const mudou =
+          Number(parcela.dias_atraso) !== calc.diasAtraso ||
+          Number(parcela.multa_valor) !== calc.multaValor ||
+          Number(parcela.juros_valor) !== calc.jurosValor ||
+          Number(parcela.valor_atualizado) !== calc.valorAtualizado ||
+          parcela.status !== novoStatus;
+
+        if (!mudou) return [];
+
+        return [
+          prisma.parcela.update({
+            where: { id: parcela.id },
+            data: {
+              dias_atraso: calc.diasAtraso,
+              multa_valor: calc.multaValor,
+              juros_valor: calc.jurosValor,
+              valor_atualizado: calc.valorAtualizado,
+              status: novoStatus
+            }
+          })
+        ];
+      })
+  );
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+
   const parcelas = cliente.emprestimos
     .flatMap((e) => e.parcelas.map((p) => ({ ...p, emprestimo: e })))
+    .map((parcela) => {
+      if (parcela.status === "paga") return parcela;
+      const dias = diasAtraso(new Date(parcela.vencimento));
+      const calc = calcularParcelaAtualizada(
+        Number(parcela.valor_original),
+        dias,
+        parcela.emprestimo.frequencia_parcela
+      );
+      return {
+        ...parcela,
+        dias_atraso: calc.diasAtraso,
+        multa_valor: calc.multaValor,
+        juros_valor: calc.jurosValor,
+        valor_atualizado: calc.valorAtualizado,
+        status: calc.diasAtraso > 0 ? "vencida" : "pendente"
+      };
+    })
     .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime());
   const totalPago = parcelas.filter((p) => p.status === "paga").reduce((acc, p) => acc + Number(p.valor_atualizado), 0);
   const saldoRestante = parcelas.filter((p) => p.status !== "paga").reduce((acc, p) => acc + Number(p.valor_atualizado), 0);

@@ -31,11 +31,27 @@ const NovoEmprestimoPersonalizadoModal = dynamic(
   }
 );
 
+const ConsultarPorDataModal = dynamic(
+  () =>
+    import("@/components/emprestimos/consultar-por-data-modal").then(
+      (m) => m.ConsultarPorDataModal
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <Button type="button" variant="outline" disabled>
+        Consultar por data
+      </Button>
+    )
+  }
+);
+
 export function EmprestimosToolbar() {
   return (
     <div className="flex flex-wrap gap-2">
       <NovoEmprestimoModal />
       <NovoEmprestimoPersonalizadoModal />
+      <ConsultarPorDataModal />
     </div>
   );
 }

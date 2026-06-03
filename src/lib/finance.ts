@@ -52,6 +52,13 @@ export function shiftCalendarDayKey(dayKey: string, days: number) {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** Intervalo [início, fim) do dia no calendário de Campo Grande. */
+export function calendarDayRangeCampoGrande(dayKey: string) {
+  const start = new Date(`${dayKey}T00:00:00-04:00`);
+  const end = new Date(`${shiftCalendarDayKey(dayKey, 1)}T00:00:00-04:00`);
+  return { start, end };
+}
+
 /** Extrai yyyy-MM-dd de input ISO, BR ou date picker. */
 export function extractCalendarDayKey(value: string): string | null {
   const trimmed = value.trim();

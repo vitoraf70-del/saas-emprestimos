@@ -3,7 +3,7 @@ import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { runWithConcurrency } from "@/lib/async-pool";
 import {
   BR_TIMEZONE,
-  calcularParcelaAtualizada,
+  calcularParcelaComIsencao,
   calendarDayKeyBR,
   dateFromCalendarDayKey,
   diasAtraso,
@@ -252,7 +252,7 @@ async function atualizarCalculoParcela(
   parcela: ParcelaCobranca,
   hoje: Date,
   diasAtrasoValor: number,
-  calc: ReturnType<typeof calcularParcelaAtualizada>
+  calc: ReturnType<typeof calcularParcelaComIsencao>
 ) {
   await prisma.parcela.update({
     where: { id: parcela.id },
@@ -314,10 +314,11 @@ export async function processarCobrancaAutomatica(
     resultado.processadas++;
     const diasAtrasoValor = diasAtraso(parcela.vencimento, hoje);
     const diasParaVencerValor = diasParaVencer(parcela.vencimento, hoje);
-    const calc = calcularParcelaAtualizada(
+    const calc = calcularParcelaComIsencao(
       Number(parcela.valor_original),
       diasAtrasoValor,
-      parcela.emprestimo.frequencia_parcela
+      parcela.emprestimo.frequencia_parcela,
+      parcela.encargos_isentos
     );
 
     await atualizarCalculoParcela(parcela, hoje, diasAtrasoValor, calc);

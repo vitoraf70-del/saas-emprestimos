@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPixCharge } from "@/lib/services/pix";
 import { prisma } from "@/lib/prisma";
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 
 export async function POST(request: Request) {
   try {
@@ -33,10 +33,11 @@ export async function POST(request: Request) {
     const atualizadas = await prisma.$transaction(
       parcelas.map((parcela) => {
         const atraso = diasAtraso(parcela.vencimento);
-        const calc = calcularParcelaAtualizada(
+        const calc = calcularParcelaComIsencao(
           Number(parcela.valor_original),
           atraso,
-          parcela.emprestimo.frequencia_parcela
+          parcela.emprestimo.frequencia_parcela,
+          parcela.encargos_isentos
         );
         return prisma.parcela.update({
           where: { id: parcela.id },

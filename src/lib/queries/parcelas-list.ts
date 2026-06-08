@@ -39,6 +39,9 @@ export async function getParcelasList(filters: ParcelasListFilters) {
         vencimento: true,
         valor_atualizado: true,
         valor_original: true,
+        multa_valor: true,
+        juros_valor: true,
+        encargos_isentos: true,
         status: true,
         emprestimo: {
           select: {

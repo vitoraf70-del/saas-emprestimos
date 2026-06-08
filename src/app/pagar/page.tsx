@@ -1,4 +1,4 @@
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { prisma } from "@/lib/prisma";
 import { toCurrency } from "@/lib/utils";
 import { PixCopyButton } from "@/components/pagar/pix-copy-button";
@@ -43,10 +43,11 @@ export default async function PagarPage({
     .flatMap((e) => e.parcelas.map((p) => ({ parcela: p, emprestimo: e })))
     .map(({ parcela: p, emprestimo: e }) => {
       const atraso = diasAtraso(new Date(p.vencimento), new Date());
-      const calc = calcularParcelaAtualizada(
+      const calc = calcularParcelaComIsencao(
         Number(p.valor_original),
         atraso,
-        e.frequencia_parcela
+        e.frequencia_parcela,
+        p.encargos_isentos
       );
       return { parcela: p, calc };
     });

@@ -181,6 +181,7 @@ model Parcela {
   avisos_vencimento  Int        @default(0)
   avisos_atraso      Int        @default(0)
   ultimo_aviso_em    DateTime?
+  encargos_isentos   Boolean    @default(false)
   emprestimo      Emprestimo    @relation(fields: [emprestimo_id], references: [id], onDelete: Cascade)
   pagamentos      Pagamento[]
 

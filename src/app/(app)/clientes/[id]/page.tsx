@@ -7,7 +7,7 @@ import { EditarClienteModal } from "@/components/clientes/editar-cliente-modal";
 import { ExcluirClienteButton } from "@/components/clientes/excluir-cliente-button";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { formatDateBR } from "@/lib/date";
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { buildPagarLink, buildPagarLinkWithCpf, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { labelOcupacao } from "@/lib/ocupacao";
 import { toCurrency } from "@/lib/utils";
@@ -37,10 +37,11 @@ export default async function ClienteDetalhePage({
     emprestimo.parcelas.flatMap((parcela) => {
       if (parcela.status === "paga") return [];
         const dias = diasAtraso(new Date(parcela.vencimento));
-        const calc = calcularParcelaAtualizada(
+        const calc = calcularParcelaComIsencao(
           Number(parcela.valor_original),
           dias,
-          emprestimo.frequencia_parcela
+          emprestimo.frequencia_parcela,
+          parcela.encargos_isentos
         );
         const novoStatus = calc.diasAtraso > 0 ? "vencida" : "pendente";
         const mudou =
@@ -76,10 +77,11 @@ export default async function ClienteDetalhePage({
     .map((parcela) => {
       if (parcela.status === "paga") return parcela;
       const dias = diasAtraso(new Date(parcela.vencimento));
-      const calc = calcularParcelaAtualizada(
+      const calc = calcularParcelaComIsencao(
         Number(parcela.valor_original),
         dias,
-        parcela.emprestimo.frequencia_parcela
+        parcela.emprestimo.frequencia_parcela,
+        parcela.encargos_isentos
       );
       return {
         ...parcela,

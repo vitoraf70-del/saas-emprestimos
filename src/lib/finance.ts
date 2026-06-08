@@ -145,6 +145,23 @@ export function encargosAtraso(dias: number, frequencia: FrequenciaParcela = "se
   };
 }
 
+export function calcularParcelaComIsencao(
+  valorOriginal: number,
+  dias: number,
+  frequencia: FrequenciaParcela = "semanal",
+  encargosIsentos = false
+) {
+  if (encargosIsentos) {
+    return {
+      diasAtraso: dias,
+      multaValor: 0,
+      jurosValor: 0,
+      valorAtualizado: valorOriginal
+    };
+  }
+  return calcularParcelaAtualizada(valorOriginal, dias, frequencia);
+}
+
 export function calcularParcelaAtualizada(
   valorOriginal: number,
   dias: number,

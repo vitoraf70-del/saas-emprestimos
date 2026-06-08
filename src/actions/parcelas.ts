@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { recalculateOpenParcelasData } from "@/lib/services/parcelas-recalculo";
 
@@ -13,10 +13,11 @@ export async function recalculateParcela(parcelaId: string) {
   if (!parcela) throw new Error("Parcela não encontrada");
 
   const dias = diasAtraso(parcela.vencimento);
-  const result = calcularParcelaAtualizada(
+  const result = calcularParcelaComIsencao(
     Number(parcela.valor_original),
     dias,
-    parcela.emprestimo.frequencia_parcela
+    parcela.emprestimo.frequencia_parcela,
+    parcela.encargos_isentos
   );
 
   const updated = await prisma.parcela.update({

@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { MarcarParcelaPagaButton } from "@/components/parcelas/marcar-parcela-paga-button";
+import { RetirarEncargosButton } from "@/components/parcelas/retirar-encargos-button";
 import { formatDateBR } from "@/lib/date";
 import { recalculateOpenParcelasData } from "@/lib/services/parcelas-recalculo";
-import {
-  getParcelasResumoList,
-  labelSituacaoParcelas,
-  PARCELAS_RESUMO_PAGE_SIZE
-} from "@/lib/queries/parcelas-resumo-list";
+import { getParcelasList, PARCELAS_PAGE_SIZE } from "@/lib/queries/parcelas-list";
 import { toCurrency } from "@/lib/utils";
+
+const parcelaStatusLabel: Record<string, string> = {
+  pendente: "Pendente",
+  vencida: "Vencida",
+  paga: "Paga"
+};
 
 function buildPageHref(
   base: { nome?: string; cpf?: string; status?: string },
@@ -34,7 +38,7 @@ export async function ParcelasTableLoader({
   page: number;
 }) {
   await recalculateOpenParcelasData();
-  const list = await getParcelasResumoList({ nome, cpf, status, page });
+  const list = await getParcelasList({ nome, cpf, status, page });
   const filters = { nome, cpf, status };
 
   return (
@@ -54,10 +58,10 @@ export async function ParcelasTableLoader({
             className="rounded-md border p-2"
           />
           <select name="status" defaultValue={status ?? ""} className="rounded-md border p-2">
-            <option value="">Status da parcela</option>
-            <option value="pendente">Com pendente</option>
-            <option value="vencida">Com vencida</option>
-            <option value="paga">Com paga</option>
+            <option value="">Todos os status</option>
+            <option value="pendente">Pendente</option>
+            <option value="vencida">Vencida</option>
+            <option value="paga">Paga</option>
           </select>
           <button type="submit" className="rounded-md bg-primary p-2 text-primary-foreground">
             Filtrar
@@ -65,54 +69,85 @@ export async function ParcelasTableLoader({
         </form>
 
         <p className="mb-3 text-sm text-muted-foreground">
-          {list.total} contrato(s) — página {list.page} de {list.totalPages} (até{" "}
-          {PARCELAS_RESUMO_PAGE_SIZE} por página). Clique no cliente para ver cada parcela.
+          {list.total} parcela(s) — página {list.page} de {list.totalPages} (até{" "}
+          {PARCELAS_PAGE_SIZE} por página). Use &quot;Parcela paga&quot; para dar baixa em PIX
+          recebido direto.
         </p>
 
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-left">
               <th className="p-3">Cliente</th>
-              <th className="p-3">Parcelas</th>
-              <th className="p-3">Próx. vencimento</th>
-              <th className="p-3">Em aberto</th>
-              <th className="p-3">Situação</th>
+              <th className="p-3">Parcela</th>
+              <th className="p-3">Vencimento</th>
+              <th className="p-3">Valor</th>
+              <th className="p-3">Status</th>
+              <th className="p-3">Ação</th>
             </tr>
           </thead>
           <tbody>
-            {list.rows.length === 0 ? (
+            {list.parcelas.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-muted-foreground">
-                  Nenhum contrato encontrado com os filtros informados.
+                <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                  Nenhuma parcela encontrada com os filtros informados.
                 </td>
               </tr>
             ) : (
-              list.rows.map((row) => (
-                <tr key={row.emprestimoId} className="border-b">
-                  <td className="p-3">
-                    <Link
-                      className="text-primary underline-offset-2 hover:underline"
-                      href={`/clientes/${row.clienteId}`}
-                    >
-                      {row.clienteNome}
-                    </Link>
-                  </td>
-                  <td className="p-3">
-                    {row.parcelasPagas}/{row.numeroParcelas} pagas
-                    {row.parcelasVencidas > 0 ? (
-                      <span className="ml-1 text-muted-foreground">
-                        ({row.parcelasVencidas} vencida
-                        {row.parcelasVencidas > 1 ? "s" : ""})
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="p-3">
-                    {row.proximoVencimento ? formatDateBR(row.proximoVencimento) : "—"}
-                  </td>
-                  <td className="p-3">{toCurrency(row.emAberto)}</td>
-                  <td className="p-3">{labelSituacaoParcelas(row.situacao)}</td>
-                </tr>
-              ))
+              list.parcelas.map((parcela) => {
+                const valorOriginal = Number(parcela.valor_original);
+                const multa = Number(parcela.multa_valor);
+                const juros = Number(parcela.juros_valor);
+                const valor =
+                  Number(parcela.valor_atualizado) || valorOriginal;
+                const valorFormatado = toCurrency(valor);
+                const temEncargos =
+                  parcela.status !== "paga" &&
+                  !parcela.encargos_isentos &&
+                  (multa > 0 || juros > 0);
+
+                return (
+                  <tr key={parcela.id} className="border-b">
+                    <td className="p-3">
+                      <Link
+                        className="text-primary underline-offset-2 hover:underline"
+                        href={`/clientes/${parcela.emprestimo.cliente_id}`}
+                      >
+                        {parcela.emprestimo.cliente.nome}
+                      </Link>
+                    </td>
+                    <td className="p-3">{parcela.numero_parcela}</td>
+                    <td className="p-3">{formatDateBR(new Date(parcela.vencimento))}</td>
+                    <td className="p-3">{valorFormatado}</td>
+                    <td className="p-3">
+                      {parcelaStatusLabel[parcela.status] ?? parcela.status}
+                    </td>
+                    <td className="p-3">
+                      {parcela.status !== "paga" ? (
+                        <div className="flex flex-wrap gap-2">
+                          {temEncargos ? (
+                            <RetirarEncargosButton
+                              id={parcela.id}
+                              clienteNome={parcela.emprestimo.cliente.nome}
+                              numeroParcela={parcela.numero_parcela}
+                              valorOriginal={toCurrency(valorOriginal)}
+                              multa={toCurrency(multa)}
+                              juros={toCurrency(juros)}
+                            />
+                          ) : null}
+                          <MarcarParcelaPagaButton
+                            id={parcela.id}
+                            clienteNome={parcela.emprestimo.cliente.nome}
+                            numeroParcela={parcela.numero_parcela}
+                            valor={valorFormatado}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

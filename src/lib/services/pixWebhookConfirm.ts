@@ -76,14 +76,15 @@ export async function confirmPagamentoByTxid(
   const valorPagamento = Number(pagamento.valor_pago);
 
   if (!pagoNoBanco) {
-    const { calcularParcelaAtualizada, diasAtraso } = await import("@/lib/finance");
+    const { calcularParcelaComIsencao, diasAtraso } = await import("@/lib/finance");
     let sum = 0;
     for (const p of parcelas) {
       const atraso = diasAtraso(p.vencimento);
-      const calc = calcularParcelaAtualizada(
+      const calc = calcularParcelaComIsencao(
         Number(p.valor_original),
         atraso,
-        p.emprestimo.frequencia_parcela
+        p.emprestimo.frequencia_parcela,
+        p.encargos_isentos
       );
       sum += calc.valorAtualizado;
     }

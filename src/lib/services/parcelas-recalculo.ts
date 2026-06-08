@@ -1,4 +1,4 @@
-import { calcularParcelaAtualizada, diasAtraso } from "@/lib/finance";
+import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { prisma } from "@/lib/prisma";
 
@@ -16,17 +16,19 @@ export async function recalculateOpenParcelasData() {
       dias_atraso: true,
       multa_valor: true,
       juros_valor: true,
-      valor_atualizado: true
+      valor_atualizado: true,
+      encargos_isentos: true
     }
   });
 
   await Promise.all(
     parcelas.map((parcela) => {
       const dias = diasAtraso(parcela.vencimento, hoje);
-      const result = calcularParcelaAtualizada(
+      const result = calcularParcelaComIsencao(
         Number(parcela.valor_original),
         dias,
-        parcela.emprestimo.frequencia_parcela
+        parcela.emprestimo.frequencia_parcela,
+        parcela.encargos_isentos
       );
       const novoStatus = result.diasAtraso > 0 ? "vencida" : "pendente";
       const mudou =

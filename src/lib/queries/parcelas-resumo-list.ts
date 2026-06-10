@@ -1,4 +1,5 @@
 import { Prisma, StatusParcela } from "@prisma/client";
+import { calendarDayKeyBR, calendarDayRangeCampoGrande } from "@/lib/finance";
 import { prisma } from "@/lib/prisma";
 
 export const PARCELAS_RESUMO_PAGE_SIZE = 25;
@@ -18,23 +19,45 @@ export type ParcelasResumoRow = {
   situacao: "vencida" | "pendente" | "em_dia" | "quitado";
 };
 
+export type ParcelasResumoStatusFilter =
+  | StatusParcela
+  | "aberto"
+  | "quitado"
+  | "todos";
+
 export type ParcelasResumoFilters = {
   page?: number;
   nome?: string;
   cpf?: string;
-  status?: StatusParcela;
+  status?: ParcelasResumoStatusFilter;
 };
+
+function parcelasWhereFromStatus(
+  status: ParcelasResumoStatusFilter | undefined
+): Prisma.ParcelaListRelationFilter | undefined {
+  const effective = status ?? "aberto";
+
+  if (effective === "todos") return undefined;
+  if (effective === "aberto") {
+    return { some: { status: { in: ["pendente", "vencida"] } } };
+  }
+  if (effective === "quitado") {
+    return { every: { status: "paga" } };
+  }
+  return { some: { status: effective } };
+}
 
 function buildWhere(filters: ParcelasResumoFilters): Prisma.EmprestimoWhereInput {
   const nome = filters.nome?.trim();
   const cpf = filters.cpf?.trim();
+  const parcelas = parcelasWhereFromStatus(filters.status);
 
   return {
     cliente: {
       nome: nome ? { contains: nome, mode: "insensitive" } : undefined,
       cpf: cpf ? { contains: cpf } : undefined
     },
-    parcelas: filters.status ? { some: { status: filters.status } } : undefined
+    parcelas
   };
 }
 
@@ -63,6 +86,33 @@ function sortByProximoVencimento<T extends { proximoVencimento: Date | null }>(r
     if (!b.proximoVencimento) return -1;
     return a.proximoVencimento.getTime() - b.proximoVencimento.getTime();
   });
+}
+
+export async function getReceberHojeResumo() {
+  const hojeKey = calendarDayKeyBR(new Date());
+  const { start, end } = calendarDayRangeCampoGrande(hojeKey);
+
+  const [agg, quantidade] = await Promise.all([
+    prisma.parcela.aggregate({
+      where: {
+        status: { in: ["pendente", "vencida"] },
+        vencimento: { gte: start, lt: end }
+      },
+      _sum: { valor_atualizado: true, valor_original: true }
+    }),
+    prisma.parcela.count({
+      where: {
+        status: { in: ["pendente", "vencida"] },
+        vencimento: { gte: start, lt: end }
+      }
+    })
+  ]);
+
+  return {
+    data: hojeKey,
+    total: toNumber(agg._sum.valor_atualizado) || toNumber(agg._sum.valor_original),
+    quantidade
+  };
 }
 
 export async function getParcelasResumoList(filters: ParcelasResumoFilters = {}) {

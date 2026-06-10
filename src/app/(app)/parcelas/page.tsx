@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { ParcelasTableLoader } from "@/components/parcelas/parcelas-table-loader";
+import type { ParcelasResumoStatusFilter } from "@/lib/queries/parcelas-resumo-list";
 
 function ParcelasTableSkeleton() {
   return (
@@ -27,11 +28,11 @@ export default function ParcelasPage({
 }) {
   const nome = searchParams.nome?.trim();
   const cpf = searchParams.cpf?.trim();
-  const status = searchParams.status as "pendente" | "paga" | "vencida" | undefined;
+  const status = searchParams.status as ParcelasResumoStatusFilter | undefined;
   const page = Number(searchParams.page ?? "1") || 1;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h2 className="text-2xl font-bold">Parcelas</h2>
       <Suspense
         key={`${nome ?? ""}-${cpf ?? ""}-${status ?? ""}-${page}`}

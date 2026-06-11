@@ -7,6 +7,18 @@ export const PARCELAS_RESUMO_PAGE_SIZE = 25;
 const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
   Number(value ?? 0);
 
+export type ParcelaAbertaRow = {
+  id: string;
+  numeroParcela: number;
+  vencimento: Date;
+  valorOriginal: number;
+  valorAtualizado: number;
+  multa: number;
+  juros: number;
+  encargosIsentos: boolean;
+  status: StatusParcela;
+};
+
 export type ParcelasResumoRow = {
   emprestimoId: string;
   clienteId: string;
@@ -17,6 +29,7 @@ export type ParcelasResumoRow = {
   emAberto: number;
   proximoVencimento: Date | null;
   situacao: "vencida" | "pendente" | "em_dia" | "quitado";
+  parcelasAbertas: ParcelaAbertaRow[];
 };
 
 export type ParcelasResumoStatusFilter =
@@ -189,7 +202,9 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
     statsPorEmprestimo.set(row.emprestimo_id, current);
   }
 
-  const allRows: ParcelasResumoRow[] = emprestimos.map((e) => {
+  type ResumoRowBase = Omit<ParcelasResumoRow, "parcelasAbertas">;
+
+  const allRows: ResumoRowBase[] = emprestimos.map((e) => {
     const stats = statsPorEmprestimo.get(e.id) ?? { pagas: 0, vencidas: 0, emAberto: 0 };
     return {
       emprestimoId: e.id,
@@ -205,9 +220,55 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
   });
 
   const rows = sortByProximoVencimento(allRows).slice(skip, skip + PARCELAS_RESUMO_PAGE_SIZE);
+  const pageEmprestimoIds = rows.map((row) => row.emprestimoId);
+
+  const parcelasAbertasPorEmprestimo = new Map<string, ParcelaAbertaRow[]>();
+
+  if (pageEmprestimoIds.length > 0) {
+    const parcelasAbertas = await prisma.parcela.findMany({
+      where: {
+        emprestimo_id: { in: pageEmprestimoIds },
+        status: { in: ["pendente", "vencida"] }
+      },
+      select: {
+        id: true,
+        emprestimo_id: true,
+        numero_parcela: true,
+        vencimento: true,
+        valor_original: true,
+        valor_atualizado: true,
+        multa_valor: true,
+        juros_valor: true,
+        encargos_isentos: true,
+        status: true
+      },
+      orderBy: { vencimento: "asc" }
+    });
+
+    for (const parcela of parcelasAbertas) {
+      const current = parcelasAbertasPorEmprestimo.get(parcela.emprestimo_id) ?? [];
+      current.push({
+        id: parcela.id,
+        numeroParcela: parcela.numero_parcela,
+        vencimento: parcela.vencimento,
+        valorOriginal: toNumber(parcela.valor_original),
+        valorAtualizado: toNumber(parcela.valor_atualizado),
+        multa: toNumber(parcela.multa_valor),
+        juros: toNumber(parcela.juros_valor),
+        encargosIsentos: parcela.encargos_isentos,
+        status: parcela.status
+      });
+      parcelasAbertasPorEmprestimo.set(parcela.emprestimo_id, current);
+    }
+  }
+
+  const rowsWithParcelas = rows.map((row) => ({
+    ...row,
+    parcelasAbertas: parcelasAbertasPorEmprestimo.get(row.emprestimoId) ?? []
+  }));
 
   return {
-    rows,
+    rows: rowsWithParcelas,
     total,
     page,
     pageSize: PARCELAS_RESUMO_PAGE_SIZE,

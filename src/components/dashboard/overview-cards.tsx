@@ -31,12 +31,12 @@ export function OverviewCards({ data }: Props) {
   return (
     <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
       {items.map(([title, value]) => (
-        <Card key={title}>
+        <Card key={title} className="border-t-2 border-t-primary/60 transition-shadow hover:shadow-md">
           <CardHeader>
             <CardTitle>{title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold">{value}</p>
+            <p className="text-xl font-semibold text-foreground">{value}</p>
           </CardContent>
         </Card>
       ))}

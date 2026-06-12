@@ -4,6 +4,7 @@ import { toCurrency } from "@/lib/utils";
 import { PixCopyButton } from "@/components/pagar/pix-copy-button";
 import { PixSettlementButton } from "@/components/pagar/pix-settlement-button";
 import { CpfSearchForm } from "@/components/pagar/cpf-search-form";
+import { Logo } from "@/components/layout/logo";
 import { formatDateBR } from "@/lib/date";
 
 function formatCpf(value: string) {
@@ -54,8 +55,12 @@ export default async function PagarPage({
   const totalQuitacao = parcelas.reduce((acc, item) => acc + item.calc.valorAtualizado, 0);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-white px-4 py-6">
-      <h1 className="mb-2 text-xl font-semibold">Pagar parcela</h1>
+    <main className="mx-auto min-h-screen w-full max-w-md bg-brand-gradient px-4 py-8">
+      <div className="mb-8 flex justify-center">
+        <Logo size="md" showLink={false} />
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-white/95 p-5 shadow-2xl shadow-black/30">
+      <h1 className="mb-2 text-xl font-semibold text-foreground">Pagar parcela</h1>
       <p className="mb-4 text-sm text-muted-foreground">
         Digite seu CPF para ver todas as parcelas pendentes.
       </p>
@@ -107,6 +112,7 @@ export default async function PagarPage({
           )}
         </section>
       ) : null}
+      </div>
     </main>
   );
 }

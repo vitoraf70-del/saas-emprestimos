@@ -9,7 +9,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Dashboard</h2>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Visão geral do seu negócio</p>
+      </div>
       <OverviewCards data={data.cards} />
       <DashboardChartsLazy />
     </div>

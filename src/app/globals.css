@@ -3,23 +3,44 @@
 @tailwind utilities;
 
 :root {
-  --background: 220 40% 99%;
-  --foreground: 220 20% 12%;
+  --background: 220 25% 97%;
+  --foreground: 218 50% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 220 20% 12%;
-  --primary: 220 80% 50%;
-  --primary-foreground: 210 40% 98%;
-  --muted: 220 20% 96%;
+  --card-foreground: 218 50% 10%;
+  --primary: 46 65% 45%;
+  --primary-foreground: 218 65% 8%;
+  --muted: 220 20% 94%;
   --muted-foreground: 220 12% 42%;
-  --border: 220 18% 90%;
-  --input: 220 18% 90%;
-  --ring: 220 80% 50%;
-  --accent: 220 20% 96%;
-  --accent-foreground: 220 20% 12%;
+  --border: 220 18% 88%;
+  --input: 220 18% 88%;
+  --ring: 46 65% 45%;
+  --accent: 46 40% 92%;
+  --accent-foreground: 218 50% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 20% 12%;
+  --popover-foreground: 218 50% 10%;
+  --sidebar: 218 65% 11%;
+  --sidebar-foreground: 210 25% 92%;
+  --sidebar-border: 218 40% 18%;
+  --sidebar-accent: 46 75% 55%;
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-background font-sans text-foreground antialiased;
+}
+
+@layer utilities {
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #050a18 0%, #0a192f 45%, #0f2744 100%);
+  }
+
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #ffd700 0%, #d4af37 50%, #b8941f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .btn-gold {
+    @apply bg-gradient-to-r from-[#D4AF37] to-[#B8941F] text-[#050A18] shadow-md shadow-[#D4AF37]/25 transition-all hover:from-[#E5C04A] hover:to-[#D4AF37] hover:shadow-lg hover:shadow-[#D4AF37]/30;
+  }
 }

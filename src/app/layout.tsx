@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
+import { Montserrat } from "next/font/google";
 import "@/app/globals.css";
 
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-sans"
+});
+
 export const metadata: Metadata = {
-  title: "LoanERP SaaS",
-  description: "Gestão de empréstimos, cobranças no WhatsApp e PIX."
+  title: "PV Soluções",
+  description: "Crédito rápido e seguro — gestão de empréstimos, cobranças e PIX."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body className={`${montserrat.variable} font-sans`}>{children}</body>
     </html>
   );
 }

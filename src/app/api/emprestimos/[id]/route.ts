@@ -11,6 +11,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       id: true,
       valor_emprestado: true,
       valor_parcela: true,
+      frequencia_parcela: true,
       cliente: { select: { nome: true } },
       parcelas: {
         select: {
@@ -34,6 +35,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     clienteNome: emprestimo.cliente.nome,
     valorEmprestado: Number(emprestimo.valor_emprestado),
     valorParcela: Number(emprestimo.valor_parcela),
+    frequenciaParcela: emprestimo.frequencia_parcela,
     parcelas: emprestimo.parcelas.map((p) => ({
       id: p.id,
       numero_parcela: p.numero_parcela,
@@ -58,15 +60,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const parcelas: UpdateEmprestimoParcelaInput[] | undefined = Array.isArray(body.parcelas)
       ? body.parcelas.map((item: Record<string, unknown>) => ({
-          id: String(item.id ?? ""),
+          id: item.id ? String(item.id) : undefined,
           valorOriginal: Number(item.valorOriginal),
           vencimento: String(item.vencimento ?? "")
         }))
       : undefined;
-
-    if (parcelas?.some((p) => !p.id)) {
-      return NextResponse.json({ error: "Parcela inválida no payload." }, { status: 400 });
-    }
 
     await updateEmprestimo(params.id, { valorEmprestado, valorParcela, parcelas });
   } catch (error) {

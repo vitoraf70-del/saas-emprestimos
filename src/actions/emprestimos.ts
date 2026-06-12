@@ -194,7 +194,7 @@ function revalidateEmprestimoViews() {
 }
 
 export type UpdateEmprestimoParcelaInput = {
-  id: string;
+  id?: string;
   valorOriginal: number;
   vencimento: string;
 };
@@ -217,17 +217,32 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
   }
 
   const parcelasPayload = input.parcelas ?? [];
-  for (const p of parcelasPayload) {
-    const parcela = emprestimo.parcelas.find((item) => item.id === p.id);
-    if (!parcela) throw new Error("Parcela não encontrada neste empréstimo.");
-    if (parcela.status === "paga") {
-      throw new Error(`Parcela ${parcela.numero_parcela} já está paga e não pode ser alterada.`);
+  const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
+  const parcelasAbertasIds = new Set(
+    emprestimo.parcelas.filter((p) => p.status !== "paga").map((p) => p.id)
+  );
+  const payloadIds = new Set<string>();
+  const maxNumeroPaga = parcelasPagas.reduce((max, p) => Math.max(max, p.numero_parcela), 0);
+
+  for (let i = 0; i < parcelasPayload.length; i++) {
+    const p = parcelasPayload[i];
+    if (p.valorOriginal <= 0) {
+      throw new Error(`Valor da parcela ${i + 1} deve ser maior que zero.`);
     }
-    if (p.valorOriginal <= 0) throw new Error("Valor da parcela deve ser maior que zero.");
     if (!parseDateFromInput(p.vencimento)) {
-      throw new Error(`Vencimento inválido na parcela ${parcela.numero_parcela}. Use DD/MM/AAAA.`);
+      throw new Error(`Vencimento inválido na parcela ${i + 1}. Use DD/MM/AAAA.`);
+    }
+    if (p.id) {
+      const parcela = emprestimo.parcelas.find((item) => item.id === p.id);
+      if (!parcela) throw new Error("Parcela não encontrada neste empréstimo.");
+      if (parcela.status === "paga") {
+        throw new Error(`Parcela ${parcela.numero_parcela} já está paga e não pode ser alterada.`);
+      }
+      payloadIds.add(p.id);
     }
   }
+
+  const idsParaExcluir = [...parcelasAbertasIds].filter((id) => !payloadIds.has(id));
 
   await prisma.$transaction(async (tx) => {
     if (input.valorEmprestado != null) {
@@ -237,28 +252,71 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
       });
     }
 
-    if (input.valorParcela != null && input.valorParcela > 0) {
-      await tx.emprestimo.update({
-        where: { id: emprestimoId },
-        data: { valor_parcela: input.valorParcela }
+    if (idsParaExcluir.length > 0) {
+      await tx.pagamento.deleteMany({ where: { parcela_id: { in: idsParaExcluir } } });
+      await tx.parcela.deleteMany({ where: { id: { in: idsParaExcluir } } });
+    }
+
+    const parcelaData = (valorOriginal: number, vencimento: Date) => ({
+      valor_original: valorOriginal,
+      valor_atualizado: valorOriginal,
+      vencimento,
+      dias_atraso: 0,
+      multa_valor: 0,
+      juros_valor: 0,
+      encargos_isentos: false,
+      status: "pendente" as const
+    });
+
+    const resolvedIds: string[] = [];
+    let valorAbertoTotal = 0;
+
+    for (let i = 0; i < parcelasPayload.length; i++) {
+      const p = parcelasPayload[i];
+      const vencimento = normalizeVencimento(parseDateFromInput(p.vencimento)!);
+      const tempNumero = 10000 + i;
+      valorAbertoTotal += p.valorOriginal;
+
+      if (p.id && parcelasAbertasIds.has(p.id)) {
+        await tx.parcela.update({
+          where: { id: p.id },
+          data: { ...parcelaData(p.valorOriginal, vencimento), numero_parcela: tempNumero }
+        });
+        resolvedIds.push(p.id);
+      } else {
+        const created = await tx.parcela.create({
+          data: {
+            emprestimo_id: emprestimoId,
+            numero_parcela: tempNumero,
+            ...parcelaData(p.valorOriginal, vencimento)
+          }
+        });
+        resolvedIds.push(created.id);
+      }
+    }
+
+    for (let i = 0; i < resolvedIds.length; i++) {
+      await tx.parcela.update({
+        where: { id: resolvedIds[i] },
+        data: { numero_parcela: maxNumeroPaga + 1 + i }
       });
     }
 
-    for (const p of parcelasPayload) {
-      const vencimento = normalizeVencimento(parseDateFromInput(p.vencimento)!);
-      await tx.parcela.update({
-        where: { id: p.id },
-        data: {
-          valor_original: p.valorOriginal,
-          valor_atualizado: p.valorOriginal,
-          vencimento,
-          dias_atraso: 0,
-          multa_valor: 0,
-          juros_valor: 0,
-          status: "pendente"
-        }
-      });
-    }
+    const totalParcelas = parcelasPagas.length + resolvedIds.length;
+    const valorParcela =
+      input.valorParcela != null && input.valorParcela > 0
+        ? input.valorParcela
+        : resolvedIds.length > 0
+          ? valorAbertoTotal / resolvedIds.length
+          : undefined;
+
+    await tx.emprestimo.update({
+      where: { id: emprestimoId },
+      data: {
+        numero_parcelas: totalParcelas,
+        ...(valorParcela != null ? { valor_parcela: valorParcela } : {})
+      }
+    });
 
     await syncEmprestimoStatus(emprestimoId, tx);
   });

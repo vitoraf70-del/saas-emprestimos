@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { MonthlyChartPoint } from "@/lib/queries/dashboard";
 
 const DashboardCharts = dynamic(
   () => import("@/components/dashboard/charts").then((m) => m.DashboardCharts),
@@ -15,6 +16,10 @@ const DashboardCharts = dynamic(
   }
 );
 
-export function DashboardChartsLazy() {
-  return <DashboardCharts />;
+type Props = {
+  data: MonthlyChartPoint[];
+};
+
+export function DashboardChartsLazy({ data }: Props) {
+  return <DashboardCharts data={data} />;
 }

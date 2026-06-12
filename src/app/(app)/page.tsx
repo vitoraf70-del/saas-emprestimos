@@ -14,7 +14,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-muted-foreground">Visão geral do seu negócio</p>
       </div>
       <OverviewCards data={data.cards} />
-      <DashboardChartsLazy />
+      <DashboardChartsLazy data={data.charts.monthly} />
     </div>
   );
 }

@@ -54,8 +54,8 @@ export default async function ClienteDetalhePage({
         if (!mudou) return [];
 
         return [
-          prisma.parcela.update({
-            where: { id: parcela.id },
+          prisma.parcela.updateMany({
+            where: { id: parcela.id, status: { in: ["pendente", "vencida"] } },
             data: {
               dias_atraso: calc.diasAtraso,
               multa_valor: calc.multaValor,

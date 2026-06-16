@@ -77,6 +77,9 @@ export async function verificarEBaixarPagamento(txid: string): Promise<Verificar
 
 /** Reconcilia pagamentos PIX pendentes consultando o banco (backup do webhook). */
 export async function reconciliarPagamentosPendentes(limit = 50) {
+  const { repararParcelasComPagamentoConfirmado } = await import("@/lib/services/parcelas-reparo");
+  const reparo = await repararParcelasComPagamentoConfirmado();
+
   const pendentes = await prisma.pagamento.findMany({
     where: { status: "pendente" },
     orderBy: { data_pagamento: "desc" },
@@ -92,5 +95,5 @@ export async function reconciliarPagamentosPendentes(limit = 50) {
     }
   }
 
-  return { verificados: pendentes.length, baixados };
+  return { verificados: pendentes.length, baixados, reparadas: reparo.reparadas };
 }

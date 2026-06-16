@@ -254,8 +254,8 @@ async function atualizarCalculoParcela(
   diasAtrasoValor: number,
   calc: ReturnType<typeof calcularParcelaComIsencao>
 ) {
-  await prisma.parcela.update({
-    where: { id: parcela.id },
+  await prisma.parcela.updateMany({
+    where: { id: parcela.id, status: { in: ["pendente", "vencida"] } },
     data: {
       dias_atraso: calc.diasAtraso,
       multa_valor: calc.multaValor,

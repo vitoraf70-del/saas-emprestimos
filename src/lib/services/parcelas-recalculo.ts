@@ -40,8 +40,8 @@ export async function recalculateOpenParcelasData() {
 
       if (!mudou) return Promise.resolve(null);
 
-      return prisma.parcela.update({
-        where: { id: parcela.id },
+      return prisma.parcela.updateMany({
+        where: { id: parcela.id, status: { in: ["pendente", "vencida"] } },
         data: {
           dias_atraso: result.diasAtraso,
           multa_valor: result.multaValor,

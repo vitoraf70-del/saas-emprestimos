@@ -17,7 +17,8 @@ export async function recalculateOpenParcelasData() {
       multa_valor: true,
       juros_valor: true,
       valor_atualizado: true,
-      encargos_isentos: true
+      encargos_isentos: true,
+      juros_isentos: true
     }
   });
 
@@ -28,7 +29,8 @@ export async function recalculateOpenParcelasData() {
         Number(parcela.valor_original),
         dias,
         parcela.emprestimo.frequencia_parcela,
-        parcela.encargos_isentos
+        parcela.encargos_isentos,
+        parcela.juros_isentos
       );
       const novoStatus = result.diasAtraso > 0 ? "vencida" : "pendente";
       const mudou =

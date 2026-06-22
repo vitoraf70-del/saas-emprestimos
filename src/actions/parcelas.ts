@@ -17,7 +17,8 @@ export async function recalculateParcela(parcelaId: string) {
     Number(parcela.valor_original),
     dias,
     parcela.emprestimo.frequencia_parcela,
-    parcela.encargos_isentos
+    parcela.encargos_isentos,
+    parcela.juros_isentos
   );
 
   const updated = await prisma.parcela.update({

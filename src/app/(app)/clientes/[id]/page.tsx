@@ -41,7 +41,8 @@ export default async function ClienteDetalhePage({
           Number(parcela.valor_original),
           dias,
           emprestimo.frequencia_parcela,
-          parcela.encargos_isentos
+          parcela.encargos_isentos,
+          parcela.juros_isentos
         );
         const novoStatus = calc.diasAtraso > 0 ? "vencida" : "pendente";
         const mudou =
@@ -81,7 +82,8 @@ export default async function ClienteDetalhePage({
         Number(parcela.valor_original),
         dias,
         parcela.emprestimo.frequencia_parcela,
-        parcela.encargos_isentos
+        parcela.encargos_isentos,
+        parcela.juros_isentos
       );
       return {
         ...parcela,

@@ -318,7 +318,8 @@ export async function processarCobrancaAutomatica(
       Number(parcela.valor_original),
       diasAtrasoValor,
       parcela.emprestimo.frequencia_parcela,
-      parcela.encargos_isentos
+      parcela.encargos_isentos,
+      parcela.juros_isentos
     );
 
     await atualizarCalculoParcela(parcela, hoje, diasAtrasoValor, calc);

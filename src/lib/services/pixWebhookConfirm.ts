@@ -84,7 +84,8 @@ export async function confirmPagamentoByTxid(
         Number(p.valor_original),
         atraso,
         p.emprestimo.frequencia_parcela,
-        p.encargos_isentos
+        p.encargos_isentos,
+        p.juros_isentos
       );
       sum += calc.valorAtualizado;
     }

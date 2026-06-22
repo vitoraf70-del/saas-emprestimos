@@ -37,7 +37,8 @@ export async function POST(request: Request) {
           Number(parcela.valor_original),
           atraso,
           parcela.emprestimo.frequencia_parcela,
-          parcela.encargos_isentos
+          parcela.encargos_isentos,
+          parcela.juros_isentos
         );
         return prisma.parcela.update({
           where: { id: parcela.id },

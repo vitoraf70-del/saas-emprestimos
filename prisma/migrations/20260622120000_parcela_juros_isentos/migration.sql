@@ -1,0 +1,1 @@
+ALTER TABLE "Parcela" ADD COLUMN "juros_isentos" BOOLEAN NOT NULL DEFAULT false;

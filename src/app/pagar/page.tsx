@@ -48,7 +48,8 @@ export default async function PagarPage({
         Number(p.valor_original),
         atraso,
         e.frequencia_parcela,
-        p.encargos_isentos
+        p.encargos_isentos,
+        p.juros_isentos
       );
       return { parcela: p, calc };
     });

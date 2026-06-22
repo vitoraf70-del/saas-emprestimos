@@ -149,7 +149,8 @@ export function calcularParcelaComIsencao(
   valorOriginal: number,
   dias: number,
   frequencia: FrequenciaParcela = "semanal",
-  encargosIsentos = false
+  encargosIsentos = false,
+  jurosIsentos = false
 ) {
   if (encargosIsentos) {
     return {
@@ -159,7 +160,16 @@ export function calcularParcelaComIsencao(
       valorAtualizado: valorOriginal
     };
   }
-  return calcularParcelaAtualizada(valorOriginal, dias, frequencia);
+
+  const result = calcularParcelaAtualizada(valorOriginal, dias, frequencia);
+  if (!jurosIsentos) return result;
+
+  return {
+    diasAtraso: result.diasAtraso,
+    multaValor: result.multaValor,
+    jurosValor: 0,
+    valorAtualizado: valorOriginal + result.multaValor
+  };
 }
 
 export function calcularParcelaAtualizada(

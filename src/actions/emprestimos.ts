@@ -2,7 +2,7 @@
 
 import { addMonths } from "date-fns";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, getTransactionPrisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { recalculateParcela } from "@/actions/parcelas";
 import {
@@ -244,32 +244,35 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
 
   const idsParaExcluir = [...parcelasAbertasIds].filter((id) => !payloadIds.has(id));
 
-  await prisma.$transaction(async (tx) => {
+  const parcelaData = (valorOriginal: number, vencimento: Date) => ({
+    valor_original: valorOriginal,
+    valor_atualizado: valorOriginal,
+    vencimento,
+    dias_atraso: 0,
+    multa_valor: 0,
+    juros_valor: 0,
+    encargos_isentos: false,
+    juros_isentos: false,
+    status: "pendente" as const
+  });
+
+  const resolvedIds: string[] = [];
+  let valorAbertoTotal = 0;
+
+  const applyParcelaChanges = async (
+    db: Pick<typeof prisma, "emprestimo" | "parcela" | "pagamento">
+  ) => {
     if (input.valorEmprestado != null) {
-      await tx.emprestimo.update({
+      await db.emprestimo.update({
         where: { id: emprestimoId },
         data: { valor_emprestado: input.valorEmprestado }
       });
     }
 
     if (idsParaExcluir.length > 0) {
-      await tx.pagamento.deleteMany({ where: { parcela_id: { in: idsParaExcluir } } });
-      await tx.parcela.deleteMany({ where: { id: { in: idsParaExcluir } } });
+      await db.pagamento.deleteMany({ where: { parcela_id: { in: idsParaExcluir } } });
+      await db.parcela.deleteMany({ where: { id: { in: idsParaExcluir } } });
     }
-
-    const parcelaData = (valorOriginal: number, vencimento: Date) => ({
-      valor_original: valorOriginal,
-      valor_atualizado: valorOriginal,
-      vencimento,
-      dias_atraso: 0,
-      multa_valor: 0,
-      juros_valor: 0,
-      encargos_isentos: false,
-      status: "pendente" as const
-    });
-
-    const resolvedIds: string[] = [];
-    let valorAbertoTotal = 0;
 
     for (let i = 0; i < parcelasPayload.length; i++) {
       const p = parcelasPayload[i];
@@ -278,13 +281,13 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
       valorAbertoTotal += p.valorOriginal;
 
       if (p.id && parcelasAbertasIds.has(p.id)) {
-        await tx.parcela.update({
+        await db.parcela.update({
           where: { id: p.id },
           data: { ...parcelaData(p.valorOriginal, vencimento), numero_parcela: tempNumero }
         });
         resolvedIds.push(p.id);
       } else {
-        const created = await tx.parcela.create({
+        const created = await db.parcela.create({
           data: {
             emprestimo_id: emprestimoId,
             numero_parcela: tempNumero,
@@ -296,7 +299,7 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
     }
 
     for (let i = 0; i < resolvedIds.length; i++) {
-      await tx.parcela.update({
+      await db.parcela.update({
         where: { id: resolvedIds[i] },
         data: { numero_parcela: maxNumeroPaga + 1 + i }
       });
@@ -310,24 +313,34 @@ export async function updateEmprestimo(emprestimoId: string, input: UpdateEmpres
           ? valorAbertoTotal / resolvedIds.length
           : undefined;
 
-    await tx.emprestimo.update({
+    await db.emprestimo.update({
       where: { id: emprestimoId },
       data: {
         numero_parcelas: totalParcelas,
         ...(valorParcela != null ? { valor_parcela: valorParcela } : {})
       }
     });
+  };
 
-    await syncEmprestimoStatus(emprestimoId, tx);
-  });
+  const txDb = getTransactionPrisma();
+  if (txDb === prisma) {
+    await applyParcelaChanges(prisma);
+  } else {
+    await txDb.$transaction(
+      async (tx) => {
+        await applyParcelaChanges(tx);
+      },
+      { maxWait: 15000, timeout: 60000 }
+    );
+  }
+
+  await syncEmprestimoStatus(emprestimoId);
 
   const abertas = await prisma.parcela.findMany({
     where: { emprestimo_id: emprestimoId, status: { in: ["pendente", "vencida"] } },
     select: { id: true }
   });
-  for (const { id } of abertas) {
-    await recalculateParcela(id);
-  }
+  await Promise.all(abertas.map(({ id }) => recalculateParcela(id)));
 
   revalidateEmprestimoViews();
 }

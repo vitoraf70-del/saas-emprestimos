@@ -1,5 +1,5 @@
 import { Prisma, StatusParcela } from "@prisma/client";
-import { calendarDayKeyBR, calendarDayRangeCampoGrande } from "@/lib/finance";
+import { calendarDayKeyBR, calendarDayRangeCampoGrande, calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { prisma } from "@/lib/prisma";
 
 export const PARCELAS_RESUMO_PAGE_SIZE = 25;
@@ -16,6 +16,7 @@ export type ParcelaAbertaRow = {
   multa: number;
   juros: number;
   encargosIsentos: boolean;
+  jurosIsentos: boolean;
   status: StatusParcela;
 };
 
@@ -240,22 +241,33 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
         multa_valor: true,
         juros_valor: true,
         encargos_isentos: true,
-        status: true
+        juros_isentos: true,
+        status: true,
+        emprestimo: { select: { frequencia_parcela: true } }
       },
       orderBy: { vencimento: "asc" }
     });
 
     for (const parcela of parcelasAbertas) {
+      const dias = diasAtraso(parcela.vencimento);
+      const calc = calcularParcelaComIsencao(
+        toNumber(parcela.valor_original),
+        dias,
+        parcela.emprestimo.frequencia_parcela,
+        parcela.encargos_isentos,
+        parcela.juros_isentos
+      );
       const current = parcelasAbertasPorEmprestimo.get(parcela.emprestimo_id) ?? [];
       current.push({
         id: parcela.id,
         numeroParcela: parcela.numero_parcela,
         vencimento: parcela.vencimento,
         valorOriginal: toNumber(parcela.valor_original),
-        valorAtualizado: toNumber(parcela.valor_atualizado),
-        multa: toNumber(parcela.multa_valor),
-        juros: toNumber(parcela.juros_valor),
+        valorAtualizado: calc.valorAtualizado,
+        multa: calc.multaValor,
+        juros: calc.jurosValor,
         encargosIsentos: parcela.encargos_isentos,
+        jurosIsentos: parcela.juros_isentos,
         status: parcela.status
       });
       parcelasAbertasPorEmprestimo.set(parcela.emprestimo_id, current);

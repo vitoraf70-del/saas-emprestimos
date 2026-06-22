@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MarcarParcelaPagaButton } from "@/components/parcelas/marcar-parcela-paga-button";
 import { RetirarEncargosButton } from "@/components/parcelas/retirar-encargos-button";
+import { RetirarJurosButton } from "@/components/parcelas/retirar-juros-button";
 import { formatDateBR } from "@/lib/date";
 import {
   labelSituacaoParcelas,
@@ -92,7 +93,8 @@ export function ParcelasListClient({ rows, total, currentPage, totalPages, filte
           <p className="mb-3 text-sm text-muted-foreground">
             {total} empréstimo(s) — página {currentPage} de {totalPages} (até{" "}
             {PARCELAS_RESUMO_PAGE_SIZE} por página). Use &quot;Dar baixa&quot; para marcar parcela
-            paga quando o PIX chegar em outra conta.
+            paga quando o PIX chegar em outra conta. No modal, use &quot;Retirar juros&quot; para
+            isentar só os juros de atraso.
           </p>
 
           <table className="w-full text-sm">
@@ -217,11 +219,13 @@ export function ParcelasListClient({ rows, total, currentPage, totalPages, filte
                 </thead>
                 <tbody>
                   {baixaTarget.parcelasAbertas.map((parcela) => {
-                    const valor =
-                      parcela.valorAtualizado > 0 ? parcela.valorAtualizado : parcela.valorOriginal;
+                    const valor = parcela.valorAtualizado;
                     const valorFormatado = toCurrency(valor);
                     const temEncargos =
                       !parcela.encargosIsentos && (parcela.multa > 0 || parcela.juros > 0);
+                    const temJuros =
+                      !parcela.encargosIsentos && !parcela.jurosIsentos && parcela.juros > 0;
+                    const valorSemJuros = toCurrency(parcela.valorOriginal + parcela.multa);
 
                     return (
                       <tr key={parcela.id} className="border-b">
@@ -233,6 +237,15 @@ export function ParcelasListClient({ rows, total, currentPage, totalPages, filte
                         </td>
                         <td className="p-2">
                           <div className="flex flex-wrap gap-2">
+                            {temJuros ? (
+                              <RetirarJurosButton
+                                id={parcela.id}
+                                clienteNome={baixaTarget.clienteNome}
+                                numeroParcela={parcela.numeroParcela}
+                                juros={toCurrency(parcela.juros)}
+                                valorSemJuros={valorSemJuros}
+                              />
+                            ) : null}
                             {temEncargos ? (
                               <RetirarEncargosButton
                                 id={parcela.id}

@@ -186,6 +186,79 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
   });
 }
 
+export async function renovarEmprestimo(
+  emprestimoId: string,
+  input: CreateEmprestimoPersonalizadoInput
+) {
+  const emprestimo = await prisma.emprestimo.findUnique({
+    where: { id: emprestimoId },
+    include: { parcelas: { orderBy: { numero_parcela: "asc" } } }
+  });
+  if (!emprestimo) throw new Error("Empréstimo não encontrado.");
+
+  const primeiroDayKey = resolvePrimeiroVencimentoDayKey(input.primeiroVencimento);
+  if (!primeiroDayKey) {
+    throw new Error("Data de vencimento inválida. Use DD/MM/AAAA.");
+  }
+  if (input.numeroParcelas < 1 || input.numeroParcelas > 120) {
+    throw new Error("Número de parcelas inválido (use entre 1 e 120).");
+  }
+  if (input.valorEmprestado <= 0) {
+    throw new Error("Valor emprestado deve ser maior que zero.");
+  }
+  if (input.valorParcela <= 0) {
+    throw new Error("Valor da parcela deve ser maior que zero.");
+  }
+
+  const valorEmprestado = Number(input.valorEmprestado.toFixed(2));
+  const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
+  const parcelasAbertasIds = emprestimo.parcelas
+    .filter((p) => p.status !== "paga")
+    .map((p) => p.id);
+  const maxNumeroPaga = parcelasPagas.reduce((max, p) => Math.max(max, p.numero_parcela), 0);
+
+  const vencimentos = buildInstallmentDueDatesFromDayKey(
+    primeiroDayKey,
+    input.numeroParcelas,
+    input.frequencia
+  );
+
+  const emprestimoAtualizado = await prisma.$transaction(async (tx) => {
+    if (parcelasAbertasIds.length > 0) {
+      await tx.pagamento.deleteMany({ where: { parcela_id: { in: parcelasAbertasIds } } });
+      await tx.parcela.deleteMany({ where: { id: { in: parcelasAbertasIds } } });
+    }
+
+    await tx.emprestimo.update({
+      where: { id: emprestimoId },
+      data: {
+        valor_emprestado: valorEmprestado,
+        numero_parcelas: parcelasPagas.length + input.numeroParcelas,
+        valor_parcela: input.valorParcela,
+        frequencia_parcela: input.frequencia,
+        data_inicio: new Date(),
+        vencimento_dia: weekdayFromCalendarDayKey(primeiroDayKey)
+      }
+    });
+
+    await tx.parcela.createMany({
+      data: vencimentos.map((vencimento, i) => ({
+        emprestimo_id: emprestimoId,
+        numero_parcela: maxNumeroPaga + 1 + i,
+        valor_original: input.valorParcela,
+        valor_atualizado: input.valorParcela,
+        vencimento
+      }))
+    });
+
+    await syncEmprestimoStatus(emprestimoId, tx);
+    return tx.emprestimo.findUnique({ where: { id: emprestimoId } });
+  });
+
+  revalidateEmprestimoViews();
+  return emprestimoAtualizado;
+}
+
 function revalidateEmprestimoViews() {
   revalidatePath("/");
   revalidatePath("/emprestimos");

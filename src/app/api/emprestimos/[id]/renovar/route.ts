@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { createEmprestimoPersonalizado } from "@/actions/emprestimos";
+import { renovarEmprestimo } from "@/actions/emprestimos";
 import { prisma } from "@/lib/prisma";
 import type { FrequenciaParcela } from "@/lib/parcel-schedule";
 
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: "Informe o primeiro vencimento." }, { status: 400 });
     }
 
-    const novoEmprestimo = await createEmprestimoPersonalizado({
+    const emprestimoRenovado = await renovarEmprestimo(params.id, {
       clienteId: emprestimoBase.cliente_id,
       valorEmprestado,
       numeroParcelas,
@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     revalidatePath("/emprestimos");
     revalidatePath("/parcelas");
 
-    return NextResponse.json(novoEmprestimo, { status: 201 });
+    return NextResponse.json(emprestimoRenovado, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao renovar empréstimo.";
     return NextResponse.json({ error: message }, { status: 400 });

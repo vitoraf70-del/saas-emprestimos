@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +38,16 @@ export function RenovarEmprestimoModal({
   const [valorParcela, setValorParcela] = useState(String(valorParcelaInicial));
   const [frequencia, setFrequencia] = useState<Frequencia>("semanal");
   const [primeiroVencimento, setPrimeiroVencimento] = useState(tomorrowCalendarDayKeyBR());
+
+  useEffect(() => {
+    if (!open) return;
+    setValorEmprestado(String(valorEmprestadoInicial));
+    setValorParcela(String(valorParcelaInicial));
+    setNumeroParcelas(numeroParcelasInicial);
+    setFrequencia("semanal");
+    setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
+    setError("");
+  }, [open, valorEmprestadoInicial, valorParcelaInicial, numeroParcelasInicial]);
 
   const valorEmprestadoNum = Number(valorEmprestado.replace(",", ".")) || 0;
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
@@ -89,7 +99,7 @@ export function RenovarEmprestimoModal({
           </p>
 
           <label className="grid gap-1 text-sm">
-            <span>Novo valor emprestado (R$)</span>
+            <span>Novo valor emprestado (R$) — saldo em aberto sugerido</span>
             <input
               type="number"
               required

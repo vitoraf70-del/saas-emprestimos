@@ -228,7 +228,8 @@ export function EmprestimosListClient({
         <RenovarEmprestimoModal
           emprestimoId={renewTarget.id}
           clienteNome={renewTarget.nome}
-          valorEmprestadoInicial={renewTarget.valorEmAberto || renewTarget.valorEmprestado}
+          valorEmprestadoInicial={renewTarget.valorEmprestado}
+          valorEmAbertoInicial={renewTarget.valorEmAberto}
           valorParcelaInicial={renewTarget.valorParcela}
           numeroParcelasInicial={renewTarget.numeroParcelas}
           open

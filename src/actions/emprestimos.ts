@@ -210,7 +210,14 @@ export async function renovarEmprestimo(
     throw new Error("Valor da parcela deve ser maior que zero.");
   }
 
-  const valorEmprestado = Number(input.valorEmprestado.toFixed(2));
+  const valorAnterior = Number(emprestimo.valor_emprestado);
+  const emAbertoAnterior = emprestimo.parcelas
+    .filter((p) => p.status !== "paga")
+    .reduce((sum, p) => sum + Number(p.valor_atualizado || p.valor_original), 0);
+  const valorInformado = Number(input.valorEmprestado.toFixed(2));
+  const valorRenovacao = Math.max(valorInformado, emAbertoAnterior);
+  const valorEmprestado = Number((valorAnterior + valorRenovacao).toFixed(2));
+
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
   const parcelasAbertasIds = emprestimo.parcelas
     .filter((p) => p.status !== "paga")

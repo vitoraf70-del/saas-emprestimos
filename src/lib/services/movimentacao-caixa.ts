@@ -3,14 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
-export async function getTotalRecebidoConfirmado() {
-  const agg = await prisma.pagamento.aggregate({
-    where: { status: "confirmado" },
-    _sum: { valor_pago: true }
-  });
-  return toNumber(agg._sum.valor_pago);
-}
-
 const toNumber = (value: Prisma.Decimal | number | null | undefined) => Number(value ?? 0);
 
 export async function registrarSaidaNovoEmprestimo(

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { registrarEntradaRecebimento } from "@/lib/services/movimentacao-caixa";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { revalidateAppAfterPayment } from "@/lib/revalidate-app";
 import { toCurrency } from "@/lib/utils";
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   if (!parcela) return NextResponse.json({ error: "Parcela não encontrada" }, { status: 404 });
 
   await prisma.$transaction(async (tx) => {
-    await tx.pagamento.create({
+    const pagamento = await tx.pagamento.create({
       data: {
         parcela_id: parcela.id,
         valor_pago: parcela.valor_atualizado,
@@ -37,6 +38,15 @@ export async function POST(request: Request) {
       }
     });
     await syncEmprestimoStatus(parcela.emprestimo_id, tx);
+    await registrarEntradaRecebimento(
+      {
+        pagamentoId: pagamento.id,
+        parcelaId: parcela.id,
+        emprestimoId: parcela.emprestimo_id,
+        valor: Number(parcela.valor_atualizado)
+      },
+      tx
+    );
   });
 
   revalidateAppAfterPayment();

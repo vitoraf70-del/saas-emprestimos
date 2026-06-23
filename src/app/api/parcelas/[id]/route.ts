@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
+import { registrarEntradaRecebimento } from "@/lib/services/movimentacao-caixa";
 import { revalidateAppAfterPayment } from "@/lib/revalidate-app";
 import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { revalidatePath } from "next/cache";
@@ -146,7 +147,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const agora = new Date();
 
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.pagamento.create({
+      const pagamento = await tx.pagamento.create({
         data: {
           parcela_id: parcela.id,
           valor_pago: valorPago,
@@ -167,6 +168,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       });
 
       await syncEmprestimoStatus(parcela.emprestimo_id, tx);
+      await registrarEntradaRecebimento(
+        {
+          pagamentoId: pagamento.id,
+          parcelaId: parcela.id,
+          emprestimoId: parcela.emprestimo_id,
+          valor: valorPago,
+          descricao: "Recebimento manual"
+        },
+        tx
+      );
       return parcelaAtualizada;
     });
 

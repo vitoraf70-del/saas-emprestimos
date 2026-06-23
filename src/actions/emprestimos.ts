@@ -17,6 +17,10 @@ import {
   buildInstallmentDueDatesFromDayKey,
   type FrequenciaParcela
 } from "@/lib/parcel-schedule";
+import {
+  registrarSaidaNovoEmprestimo,
+  registrarSaidaRenovacao
+} from "@/lib/services/movimentacao-caixa";
 
 type CreateEmprestimoInput = {
   clienteId: string;
@@ -58,6 +62,7 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
     });
 
     await syncEmprestimoStatus(emprestimo.id, tx);
+    await registrarSaidaNovoEmprestimo(emprestimo.id, input.valorEmprestado, tx);
     revalidateEmprestimoViews();
     return emprestimo;
   });
@@ -118,6 +123,7 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
     });
 
     await syncEmprestimoStatus(emprestimo.id, tx);
+    await registrarSaidaNovoEmprestimo(emprestimo.id, input.valor, tx);
     revalidateEmprestimoViews();
     return emprestimo;
   });
@@ -184,14 +190,24 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
     });
 
     await syncEmprestimoStatus(emprestimo.id, tx);
+    await registrarSaidaNovoEmprestimo(emprestimo.id, valorEmprestado, tx);
     revalidateEmprestimoViews();
     return emprestimo;
   });
 }
 
+export type RenovarEmprestimoInput = {
+  clienteId: string;
+  numeroParcelas: number;
+  valorParcela: number;
+  frequencia: FrequenciaParcela;
+  primeiroVencimento: string;
+  valorLiberadoCaixa: number;
+};
+
 export async function renovarEmprestimo(
   emprestimoId: string,
-  input: CreateEmprestimoPersonalizadoInput
+  input: RenovarEmprestimoInput
 ) {
   const emprestimo = await prisma.emprestimo.findUnique({
     where: { id: emprestimoId },
@@ -206,17 +222,14 @@ export async function renovarEmprestimo(
   if (input.numeroParcelas < 1 || input.numeroParcelas > 120) {
     throw new Error("Número de parcelas inválido (use entre 1 e 120).");
   }
-  if (input.valorEmprestado <= 0) {
-    throw new Error("Valor emprestado deve ser maior que zero.");
-  }
   if (input.valorParcela <= 0) {
     throw new Error("Valor da parcela deve ser maior que zero.");
   }
 
-  const valorAnterior = Number(emprestimo.valor_emprestado);
-  const valorInformado = Number(input.valorEmprestado.toFixed(2));
-  // Cada renovação soma o principal emprestado nesta operação (sem juros).
-  const valorEmprestado = Number((valorAnterior + valorInformado).toFixed(2));
+  const valorLiberadoCaixa = Number((input.valorLiberadoCaixa ?? 0).toFixed(2));
+  if (valorLiberadoCaixa < 0) {
+    throw new Error("Valor liberado em caixa não pode ser negativo.");
+  }
 
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
   const parcelasAbertasIds = emprestimo.parcelas
@@ -239,7 +252,6 @@ export async function renovarEmprestimo(
     await tx.emprestimo.update({
       where: { id: emprestimoId },
       data: {
-        valor_emprestado: valorEmprestado,
         numero_parcelas: parcelasPagas.length + input.numeroParcelas,
         valor_parcela: input.valorParcela,
         frequencia_parcela: input.frequencia,
@@ -259,6 +271,7 @@ export async function renovarEmprestimo(
     });
 
     await syncEmprestimoStatus(emprestimoId, tx);
+    await registrarSaidaRenovacao(emprestimoId, valorLiberadoCaixa, tx);
     return tx.emprestimo.findUnique({ where: { id: emprestimoId } });
   });
 

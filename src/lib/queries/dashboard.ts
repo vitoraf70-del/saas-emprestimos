@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getGestaoCaixaData } from "@/lib/services/movimentacao-caixa";
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const CHART_MONTHS = 6;
@@ -128,6 +129,7 @@ export async function getDashboardData() {
   const inadimplenciaPercentual = totalParcelas ? (parcelasVencidas / totalParcelas) * 100 : 0;
 
   const monthly = await getMonthlyChartData();
+  const caixa = await getGestaoCaixaData();
 
   return {
     cards: {
@@ -141,6 +143,7 @@ export async function getDashboardData() {
       valorEmAtraso,
       clientesAtivos: clientes
     },
+    caixa,
     charts: {
       monthly
     }

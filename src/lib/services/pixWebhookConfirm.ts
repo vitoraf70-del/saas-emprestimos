@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { syncEmprestimoStatus } from "@/lib/emprestimo-status";
 import { revalidateAppAfterPayment } from "@/lib/revalidate-app";
+import { registrarEntradaRecebimento } from "@/lib/services/movimentacao-caixa";
 import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { toCurrency } from "@/lib/utils";
 
@@ -127,6 +128,16 @@ export async function confirmPagamentoByTxid(
       for (const emprestimoId of emprestimoIds) {
         await syncEmprestimoStatus(emprestimoId, tx);
       }
+
+      await registrarEntradaRecebimento(
+        {
+          pagamentoId: pagamento.id,
+          parcelaId: pagamento.parcela_id,
+          emprestimoId: parcelas[0]!.emprestimo_id,
+          valor: valorPagamento
+        },
+        tx
+      );
     });
   } catch (error) {
     await prisma.pagamento.updateMany({

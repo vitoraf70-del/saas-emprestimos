@@ -34,6 +34,9 @@ export function OverviewCards({ data }: Props) {
         <h3 className="text-lg font-semibold tracking-tight">Carteira</h3>
         <p className="text-sm text-muted-foreground">Quanto está emprestado e a receber dos clientes</p>
       </div>
+      <p className="text-xs text-muted-foreground -mt-1">
+        Total recebido = pagamentos confirmados (igual à Gestão de Caixa)
+      </p>
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         {items.map(([title, value]) => (
           <Card key={title} className="border-t-2 border-t-primary/60 transition-shadow hover:shadow-md">

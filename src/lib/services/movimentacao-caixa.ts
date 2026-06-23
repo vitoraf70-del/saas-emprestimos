@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
+export async function getTotalRecebidoConfirmado() {
+  const agg = await prisma.pagamento.aggregate({
+    where: { status: "confirmado" },
+    _sum: { valor_pago: true }
+  });
+  return toNumber(agg._sum.valor_pago);
+}
+
 const toNumber = (value: Prisma.Decimal | number | null | undefined) => Number(value ?? 0);
 
 export async function registrarSaidaNovoEmprestimo(
@@ -72,19 +80,26 @@ export async function registrarEntradaRecebimento(
 }
 
 export async function getGestaoCaixaData() {
-  const [config, agg] = await Promise.all([
+  const [config, liberadoNovosAgg, liberadoRenovacoesAgg, recebidoAgg] = await Promise.all([
     prisma.configCaixa.findUnique({ where: { id: "default" } }),
-    prisma.movimentacaoCaixa.groupBy({
-      by: ["tipo"],
+    prisma.$queryRaw<{ total: Prisma.Decimal | null }[]>`
+      SELECT SUM(COALESCE(valor_principal_base, valor_emprestado)) AS total
+      FROM "Emprestimo"
+    `,
+    prisma.movimentacaoCaixa.aggregate({
+      where: { tipo: "renovacao" },
       _sum: { valor: true }
+    }),
+    prisma.pagamento.aggregate({
+      where: { status: "confirmado" },
+      _sum: { valor_pago: true }
     })
   ]);
 
-  const byType = new Map(agg.map((row) => [row.tipo, toNumber(row._sum.valor)]));
   const saldoInicial = toNumber(config?.saldo_inicial);
-  const liberadoNovos = byType.get("novo_emprestimo") ?? 0;
-  const liberadoRenovacoes = byType.get("renovacao") ?? 0;
-  const recebido = byType.get("recebimento") ?? 0;
+  const liberadoNovos = toNumber(liberadoNovosAgg[0]?.total);
+  const liberadoRenovacoes = toNumber(liberadoRenovacoesAgg._sum.valor);
+  const recebido = toNumber(recebidoAgg._sum.valor_pago);
   const saldoAtual = saldoInicial + recebido - liberadoNovos - liberadoRenovacoes;
 
   return {

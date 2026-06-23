@@ -41,9 +41,9 @@ async function getMonthlyChartData(): Promise<MonthlyChartPoint[]> {
 
   const [recebimentosRows, emprestadoRows, atrasoRows] = await Promise.all([
     prisma.$queryRaw<{ mes: Date; total: Prisma.Decimal }[]>`
-      SELECT date_trunc('month', data_pagamento) AS mes, SUM(valor_atualizado) AS total
-      FROM "Parcela"
-      WHERE status = 'paga'
+      SELECT date_trunc('month', data_pagamento) AS mes, SUM(valor_pago) AS total
+      FROM "Pagamento"
+      WHERE status = 'confirmado'
         AND data_pagamento IS NOT NULL
         AND data_pagamento >= ${rangeStart}
       GROUP BY 1
@@ -90,7 +90,6 @@ async function getMonthlyChartData(): Promise<MonthlyChartPoint[]> {
 export async function getDashboardData() {
   const [
     emprestadoAgg,
-    recebidoParcelasAgg,
     aReceberAgg,
     parcelasVencidas,
     atrasoAgg,
@@ -98,10 +97,6 @@ export async function getDashboardData() {
     clientes
   ] = await Promise.all([
     prisma.emprestimo.aggregate({ _sum: { valor_emprestado: true } }),
-    prisma.parcela.aggregate({
-      where: { status: "paga" },
-      _sum: { valor_atualizado: true }
-    }),
     prisma.parcela.aggregate({
       where: { status: { not: "paga" } },
       _sum: { valor_atualizado: true }
@@ -118,8 +113,11 @@ export async function getDashboardData() {
     prisma.cliente.count()
   ]);
 
+  const monthly = await getMonthlyChartData();
+  const caixa = await getGestaoCaixaData();
+
   const totalEmprestado = toNumber(emprestadoAgg._sum.valor_emprestado);
-  const totalRecebido = toNumber(recebidoParcelasAgg._sum.valor_atualizado);
+  const totalRecebido = caixa.recebido;
   const totalAReceber = toNumber(aReceberAgg._sum.valor_atualizado);
   const lucroTotal = totalRecebido - totalEmprestado;
   const lucroPercentual = totalEmprestado ? (lucroTotal / totalEmprestado) * 100 : 0;
@@ -127,9 +125,6 @@ export async function getDashboardData() {
 
   const totalParcelas = parcelasPorStatus.reduce((acc, row) => acc + row._count.id, 0);
   const inadimplenciaPercentual = totalParcelas ? (parcelasVencidas / totalParcelas) * 100 : 0;
-
-  const monthly = await getMonthlyChartData();
-  const caixa = await getGestaoCaixaData();
 
   return {
     cards: {

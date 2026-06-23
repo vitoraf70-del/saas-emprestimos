@@ -23,7 +23,7 @@ export function CaixaCards({ data }: Props) {
       <div>
         <h3 className="text-lg font-semibold tracking-tight">Gestão de Caixa</h3>
         <p className="text-sm text-muted-foreground">
-          Dinheiro que realmente entrou e saiu do seu bolso
+          Dinheiro que realmente entrou e saiu do seu bolso (mesmos recebimentos da Carteira)
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -47,6 +47,7 @@ export function EmprestimosListClient({
     id: string;
     nome: string;
     valorEmprestado: number;
+    valorPrincipalBase: number;
     valorEmAberto: number;
     valorParcela: number;
     numeroParcelas: number;
@@ -150,6 +151,7 @@ export function EmprestimosListClient({
                             id: e.id,
                             nome: e.clienteNome,
                             valorEmprestado: e.valorEmprestado,
+                            valorPrincipalBase: e.valorPrincipalBase,
                             valorEmAberto: e.emAberto,
                             valorParcela: e.valorParcela,
                             numeroParcelas: e.numeroParcelas
@@ -228,7 +230,8 @@ export function EmprestimosListClient({
         <RenovarEmprestimoModal
           emprestimoId={renewTarget.id}
           clienteNome={renewTarget.nome}
-          valorEmprestadoInicial={renewTarget.valorEmprestado}
+          valorEmprestadoAcumulado={renewTarget.valorEmprestado}
+          valorPrincipalRenovacao={renewTarget.valorPrincipalBase}
           valorEmAbertoInicial={renewTarget.valorEmAberto}
           valorParcelaInicial={renewTarget.valorParcela}
           numeroParcelasInicial={renewTarget.numeroParcelas}

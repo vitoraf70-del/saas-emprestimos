@@ -9,6 +9,7 @@ const toNumber = (value: Prisma.Decimal | number | null | undefined) =>
 export type EmprestimoListRow = {
   id: string;
   valorEmprestado: number;
+  valorPrincipalBase: number;
   valorParcela: number;
   numeroParcelas: number;
   status: string;
@@ -53,6 +54,7 @@ export async function getEmprestimosList(filters: EmprestimosListFilters = {}) {
       select: {
         id: true,
         valor_emprestado: true,
+        valor_principal_base: true,
         valor_parcela: true,
         numero_parcelas: true,
         status: true,
@@ -112,6 +114,7 @@ export async function getEmprestimosList(filters: EmprestimosListFilters = {}) {
     return {
       id: e.id,
       valorEmprestado: toNumber(e.valor_emprestado),
+      valorPrincipalBase: toNumber(e.valor_principal_base) || toNumber(e.valor_emprestado),
       valorParcela: toNumber(e.valor_parcela),
       numeroParcelas: e.numero_parcelas,
       status: e.status,

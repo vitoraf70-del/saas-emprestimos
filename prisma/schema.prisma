@@ -148,6 +148,7 @@ model Emprestimo {
   id                    String           @id @default(cuid())
   cliente_id            String
   valor_emprestado      Decimal          @db.Decimal(12, 2)
+  valor_principal_base  Decimal?         @db.Decimal(12, 2)
   taxa_juros_percentual Decimal          @db.Decimal(5, 2)
   numero_parcelas       Int
   valor_parcela         Decimal          @db.Decimal(12, 2)

@@ -14,7 +14,8 @@ type Frequencia = "diario" | "semanal";
 type Props = {
   emprestimoId: string;
   clienteNome: string;
-  valorEmprestadoInicial: number;
+  valorEmprestadoAcumulado: number;
+  valorPrincipalRenovacao: number;
   valorEmAbertoInicial: number;
   valorParcelaInicial: number;
   numeroParcelasInicial: number;
@@ -25,7 +26,8 @@ type Props = {
 export function RenovarEmprestimoModal({
   emprestimoId,
   clienteNome,
-  valorEmprestadoInicial,
+  valorEmprestadoAcumulado,
+  valorPrincipalRenovacao,
   valorEmAbertoInicial,
   valorParcelaInicial,
   numeroParcelasInicial,
@@ -36,24 +38,25 @@ export function RenovarEmprestimoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [numeroParcelas, setNumeroParcelas] = useState(numeroParcelasInicial);
-  const [valorEmprestado, setValorEmprestado] = useState(String(valorEmprestadoInicial));
+  const [valorEmprestado, setValorEmprestado] = useState(String(valorPrincipalRenovacao));
   const [valorParcela, setValorParcela] = useState(String(valorParcelaInicial));
   const [frequencia, setFrequencia] = useState<Frequencia>("semanal");
   const [primeiroVencimento, setPrimeiroVencimento] = useState(tomorrowCalendarDayKeyBR());
 
   useEffect(() => {
     if (!open) return;
-    setValorEmprestado(String(valorEmprestadoInicial));
+    setValorEmprestado(String(valorPrincipalRenovacao));
     setValorParcela(String(valorParcelaInicial));
     setNumeroParcelas(numeroParcelasInicial);
     setFrequencia("semanal");
     setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
     setError("");
-  }, [open, valorEmprestadoInicial, valorParcelaInicial, numeroParcelasInicial]);
+  }, [open, valorPrincipalRenovacao, valorParcelaInicial, numeroParcelasInicial]);
 
   const valorEmprestadoNum = Number(valorEmprestado.replace(",", ".")) || 0;
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
   const totalAReceber = valorParcelaNum * numeroParcelas;
+  const totalEmprestadoAposRenovacao = valorEmprestadoAcumulado + valorEmprestadoNum;
   const jurosEstimado = Math.max(0, totalAReceber - valorEmprestadoNum);
 
   const parcelasCalculadas = useMemo(() => {
@@ -102,12 +105,15 @@ export function RenovarEmprestimoModal({
           </p>
 
           <p className="rounded-md border bg-muted/40 p-2 text-sm">
+            Total já emprestado neste contrato:{" "}
+            <span className="font-semibold">{toCurrency(valorEmprestadoAcumulado)}</span>
+            <br />
             Saldo em aberto (a receber):{" "}
             <span className="font-semibold">{toCurrency(valorEmAbertoInicial)}</span>
           </p>
 
           <label className="grid gap-1 text-sm">
-            <span>Valor emprestado — principal (R$)</span>
+            <span>Principal emprestado nesta renovação (R$)</span>
             <input
               type="number"
               required
@@ -117,9 +123,6 @@ export function RenovarEmprestimoModal({
               onChange={(e) => setValorEmprestado(e.target.value)}
               className="rounded-md border p-2"
             />
-            <span className="text-xs text-muted-foreground">
-              Só aumente se emprestar capital adicional nesta renovação.
-            </span>
           </label>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -181,7 +184,10 @@ export function RenovarEmprestimoModal({
           </p>
 
           <p className="rounded-md border bg-muted/40 p-2 text-sm">
-            Principal emprestado: <span className="font-semibold">{toCurrency(valorEmprestadoNum)}</span>
+            Principal desta renovação: <span className="font-semibold">{toCurrency(valorEmprestadoNum)}</span>
+            <br />
+            Total emprestado após renovar:{" "}
+            <span className="font-semibold">{toCurrency(totalEmprestadoAposRenovacao)}</span>
             <br />
             {numeroParcelas}x de <span className="font-semibold">{toCurrency(valorParcelaNum)}</span>
             <br />

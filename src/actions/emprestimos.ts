@@ -35,6 +35,7 @@ export async function createEmprestimo(input: CreateEmprestimoInput) {
       data: {
         cliente_id: input.clienteId,
         valor_emprestado: input.valorEmprestado,
+        valor_principal_base: input.valorEmprestado,
         taxa_juros_percentual: input.taxaJurosPercentual,
         numero_parcelas: input.numeroParcelas,
         valor_parcela: valorParcela,
@@ -90,6 +91,7 @@ export async function createEmprestimoSimples(input: CreateEmprestimoSimplesInpu
       data: {
         cliente_id: input.clienteId,
         valor_emprestado: input.valor,
+        valor_principal_base: input.valor,
         taxa_juros_percentual: 0,
         numero_parcelas: input.numeroParcelas,
         valor_parcela: valorParcela,
@@ -153,6 +155,7 @@ export async function createEmprestimoPersonalizado(input: CreateEmprestimoPerso
       data: {
         cliente_id: input.clienteId,
         valor_emprestado: valorEmprestado,
+        valor_principal_base: valorEmprestado,
         taxa_juros_percentual: 0,
         numero_parcelas: input.numeroParcelas,
         valor_parcela: input.valorParcela,
@@ -212,8 +215,8 @@ export async function renovarEmprestimo(
 
   const valorAnterior = Number(emprestimo.valor_emprestado);
   const valorInformado = Number(input.valorEmprestado.toFixed(2));
-  // Principal emprestado: mantém o atual ou aumenta se houver capital adicional na renovação.
-  const valorEmprestado = Number(Math.max(valorAnterior, valorInformado).toFixed(2));
+  // Cada renovação soma o principal emprestado nesta operação (sem juros).
+  const valorEmprestado = Number((valorAnterior + valorInformado).toFixed(2));
 
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
   const parcelasAbertasIds = emprestimo.parcelas

@@ -36,29 +36,25 @@ export function RenovarEmprestimoModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [numeroParcelas, setNumeroParcelas] = useState(numeroParcelasInicial);
-  const [valorEmprestado, setValorEmprestado] = useState(
-    String(valorEmAbertoInicial || valorEmprestadoInicial)
-  );
+  const [valorEmprestado, setValorEmprestado] = useState(String(valorEmprestadoInicial));
   const [valorParcela, setValorParcela] = useState(String(valorParcelaInicial));
   const [frequencia, setFrequencia] = useState<Frequencia>("semanal");
   const [primeiroVencimento, setPrimeiroVencimento] = useState(tomorrowCalendarDayKeyBR());
 
   useEffect(() => {
     if (!open) return;
-    const saldoRenovacao = valorEmAbertoInicial || valorEmprestadoInicial;
-    setValorEmprestado(String(saldoRenovacao));
+    setValorEmprestado(String(valorEmprestadoInicial));
     setValorParcela(String(valorParcelaInicial));
     setNumeroParcelas(numeroParcelasInicial);
     setFrequencia("semanal");
     setPrimeiroVencimento(tomorrowCalendarDayKeyBR());
     setError("");
-  }, [open, valorEmprestadoInicial, valorEmAbertoInicial, valorParcelaInicial, numeroParcelasInicial]);
+  }, [open, valorEmprestadoInicial, valorParcelaInicial, numeroParcelasInicial]);
 
   const valorEmprestadoNum = Number(valorEmprestado.replace(",", ".")) || 0;
-  const saldoRenovacao = Math.max(valorEmprestadoNum, valorEmAbertoInicial || 0);
-  const totalEmprestadoAposRenovacao = valorEmprestadoInicial + saldoRenovacao;
   const valorParcelaNum = Number(valorParcela.replace(",", ".")) || 0;
   const totalAReceber = valorParcelaNum * numeroParcelas;
+  const jurosEstimado = Math.max(0, totalAReceber - valorEmprestadoNum);
 
   const parcelasCalculadas = useMemo(() => {
     if (!primeiroVencimento) return [];
@@ -105,17 +101,25 @@ export function RenovarEmprestimoModal({
             Cliente: <span className="font-medium text-foreground">{clienteNome}</span>
           </p>
 
+          <p className="rounded-md border bg-muted/40 p-2 text-sm">
+            Saldo em aberto (a receber):{" "}
+            <span className="font-semibold">{toCurrency(valorEmAbertoInicial)}</span>
+          </p>
+
           <label className="grid gap-1 text-sm">
-            <span>Valor desta renovação (R$) — saldo em aberto sugerido</span>
+            <span>Valor emprestado — principal (R$)</span>
             <input
               type="number"
               required
-              min={valorEmAbertoInicial || 0.01}
+              min={0.01}
               step={0.01}
               value={valorEmprestado}
               onChange={(e) => setValorEmprestado(e.target.value)}
               className="rounded-md border p-2"
             />
+            <span className="text-xs text-muted-foreground">
+              Só aumente se emprestar capital adicional nesta renovação.
+            </span>
           </label>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -177,17 +181,13 @@ export function RenovarEmprestimoModal({
           </p>
 
           <p className="rounded-md border bg-muted/40 p-2 text-sm">
-            Já emprestado: <span className="font-semibold">{toCurrency(valorEmprestadoInicial)}</span>
-            <br />
-            Esta renovação: <span className="font-semibold">{toCurrency(saldoRenovacao)}</span>
-            <br />
-            Total emprestado após renovar:{" "}
-            <span className="font-semibold">{toCurrency(totalEmprestadoAposRenovacao)}</span>
+            Principal emprestado: <span className="font-semibold">{toCurrency(valorEmprestadoNum)}</span>
             <br />
             {numeroParcelas}x de <span className="font-semibold">{toCurrency(valorParcelaNum)}</span>
             <br />
-            Total a receber nas novas parcelas:{" "}
-            <span className="font-semibold">{toCurrency(totalAReceber)}</span>
+            Total a receber: <span className="font-semibold">{toCurrency(totalAReceber)}</span>
+            <br />
+            Juros estimado: <span className="font-semibold">{toCurrency(jurosEstimado)}</span>
           </p>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

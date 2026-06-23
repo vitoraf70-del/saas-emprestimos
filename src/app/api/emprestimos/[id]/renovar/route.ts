@@ -26,6 +26,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const valorLiberadoCaixa = Number(body.valorLiberadoCaixa ?? 0);
+    const valorRenovacaoCarteira = Number(body.valorRenovacaoCarteira ?? 0);
     const numeroParcelas = Number(body.numeroParcelas);
     const valorParcela = Number(body.valorParcela);
     const primeiroVencimento = String(body.primeiroVencimento ?? "");
@@ -36,6 +37,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const emprestimoRenovado = await renovarEmprestimo(params.id, {
       clienteId: emprestimoBase.cliente_id,
+      valorRenovacaoCarteira,
       valorLiberadoCaixa,
       numeroParcelas,
       valorParcela,

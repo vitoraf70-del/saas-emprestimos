@@ -231,6 +231,7 @@ export function EmprestimosListClient({
           emprestimoId={renewTarget.id}
           clienteNome={renewTarget.nome}
           valorEmprestadoAcumulado={renewTarget.valorEmprestado}
+          valorPrincipalBase={renewTarget.valorPrincipalBase}
           valorEmAbertoInicial={renewTarget.valorEmAberto}
           valorParcelaInicial={renewTarget.valorParcela}
           numeroParcelasInicial={renewTarget.numeroParcelas}

@@ -202,6 +202,7 @@ export type RenovarEmprestimoInput = {
   valorParcela: number;
   frequencia: FrequenciaParcela;
   primeiroVencimento: string;
+  valorRenovacaoCarteira: number;
   valorLiberadoCaixa: number;
 };
 
@@ -227,9 +228,16 @@ export async function renovarEmprestimo(
   }
 
   const valorLiberadoCaixa = Number((input.valorLiberadoCaixa ?? 0).toFixed(2));
+  const valorRenovacaoCarteira = Number((input.valorRenovacaoCarteira ?? 0).toFixed(2));
   if (valorLiberadoCaixa < 0) {
     throw new Error("Valor liberado em caixa não pode ser negativo.");
   }
+  if (valorRenovacaoCarteira < 0) {
+    throw new Error("Valor da renovação na carteira não pode ser negativo.");
+  }
+
+  const valorAnterior = Number(emprestimo.valor_emprestado);
+  const valorEmprestado = Number((valorAnterior + valorRenovacaoCarteira).toFixed(2));
 
   const parcelasPagas = emprestimo.parcelas.filter((p) => p.status === "paga");
   const parcelasAbertasIds = emprestimo.parcelas
@@ -252,6 +260,7 @@ export async function renovarEmprestimo(
     await tx.emprestimo.update({
       where: { id: emprestimoId },
       data: {
+        valor_emprestado: valorEmprestado,
         numero_parcelas: parcelasPagas.length + input.numeroParcelas,
         valor_parcela: input.valorParcela,
         frequencia_parcela: input.frequencia,

@@ -25,11 +25,42 @@ export type ClientePorDataRow = {
   createdAt: string;
 };
 
+export type RenovacaoPorDataRow = {
+  id: string;
+  emprestimoId: string;
+  clienteId: string;
+  clienteNome: string;
+  valorCarteira: number;
+  valorCaixa: number;
+  valorParcela: number;
+  numeroParcelas: number;
+  status: string;
+  createdAt: string;
+};
+
 export type ConsultaPorDataResult = {
   data: string;
   emprestimos: EmprestimoPorDataRow[];
+  renovacoes: RenovacaoPorDataRow[];
   clientes: ClientePorDataRow[];
 };
+
+type RenovacaoMeta = {
+  valorCarteira?: number;
+  numeroParcelas?: number;
+  valorParcela?: number;
+};
+
+function parseRenovacaoMeta(descricao: string | null): RenovacaoMeta | null {
+  if (!descricao) return null;
+  try {
+    const parsed = JSON.parse(descricao) as RenovacaoMeta;
+    if (typeof parsed.valorCarteira === "number") return parsed;
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export function resolveConsultaPorDataDayKey(value: string | null | undefined) {
   if (!value) return null;
@@ -39,7 +70,7 @@ export function resolveConsultaPorDataDayKey(value: string | null | undefined) {
 export async function getConsultaPorData(dayKey: string): Promise<ConsultaPorDataResult> {
   const { start, end } = calendarDayRangeCampoGrande(dayKey);
 
-  const [emprestimos, clientes] = await Promise.all([
+  const [emprestimos, renovacoes, clientes] = await Promise.all([
     prisma.emprestimo.findMany({
       where: { created_at: { gte: start, lt: end } },
       select: {
@@ -50,6 +81,28 @@ export async function getConsultaPorData(dayKey: string): Promise<ConsultaPorDat
         status: true,
         created_at: true,
         cliente: { select: { id: true, nome: true, cpf: true } }
+      },
+      orderBy: { created_at: "asc" }
+    }),
+    prisma.movimentacaoCaixa.findMany({
+      where: {
+        tipo: "renovacao",
+        created_at: { gte: start, lt: end }
+      },
+      select: {
+        id: true,
+        valor: true,
+        descricao: true,
+        created_at: true,
+        emprestimo: {
+          select: {
+            id: true,
+            status: true,
+            valor_parcela: true,
+            numero_parcelas: true,
+            cliente: { select: { id: true, nome: true } }
+          }
+        }
       },
       orderBy: { created_at: "asc" }
     }),
@@ -79,6 +132,25 @@ export async function getConsultaPorData(dayKey: string): Promise<ConsultaPorDat
       status: e.status,
       createdAt: e.created_at.toISOString()
     })),
+    renovacoes: renovacoes
+      .filter((r) => r.emprestimo)
+      .map((r) => {
+        const meta = parseRenovacaoMeta(r.descricao);
+        const emprestimo = r.emprestimo!;
+
+        return {
+          id: r.id,
+          emprestimoId: emprestimo.id,
+          clienteId: emprestimo.cliente.id,
+          clienteNome: emprestimo.cliente.nome,
+          valorCarteira: meta?.valorCarteira ?? toNumber(r.valor),
+          valorCaixa: toNumber(r.valor),
+          valorParcela: meta?.valorParcela ?? toNumber(emprestimo.valor_parcela),
+          numeroParcelas: meta?.numeroParcelas ?? emprestimo.numero_parcelas,
+          status: emprestimo.status,
+          createdAt: r.created_at.toISOString()
+        };
+      }),
     clientes: clientes.map((c) => ({
       id: c.id,
       nome: c.nome,

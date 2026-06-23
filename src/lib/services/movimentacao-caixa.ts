@@ -25,18 +25,24 @@ export async function registrarSaidaNovoEmprestimo(
 
 export async function registrarSaidaRenovacao(
   emprestimoId: string,
-  valor: number,
-  db: Db = prisma,
-  descricao = "Renovação de empréstimo"
+  valorCaixa: number,
+  meta: {
+    valorCarteira: number;
+    numeroParcelas: number;
+    valorParcela: number;
+  },
+  db: Db = prisma
 ) {
-  if (valor <= 0) return;
-
   await db.movimentacaoCaixa.create({
     data: {
       tipo: "renovacao",
-      valor,
+      valor: Math.max(0, valorCaixa),
       emprestimo_id: emprestimoId,
-      descricao
+      descricao: JSON.stringify({
+        valorCarteira: meta.valorCarteira,
+        numeroParcelas: meta.numeroParcelas,
+        valorParcela: meta.valorParcela
+      })
     }
   });
 }

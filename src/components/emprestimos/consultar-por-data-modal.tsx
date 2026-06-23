@@ -121,6 +121,48 @@ export function ConsultarPorDataModal() {
 
                 <section className="space-y-2">
                   <h3 className="text-sm font-semibold">
+                    Renovações realizadas ({result.renovacoes.length})
+                  </h3>
+                  {result.renovacoes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma renovação em {formatDateBR(new Date(`${result.data}T12:00:00-04:00`))}.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-md border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/50 text-left">
+                            <th className="p-2">Cliente</th>
+                            <th className="p-2">Carteira</th>
+                            <th className="p-2">Caixa</th>
+                            <th className="p-2">Parcelas</th>
+                            <th className="p-2">Status</th>
+                            <th className="p-2">Horário</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {result.renovacoes.map((r) => (
+                            <tr key={r.id} className="border-b">
+                              <td className="p-2">{r.clienteNome}</td>
+                              <td className="p-2">{toCurrency(r.valorCarteira)}</td>
+                              <td className="p-2">{toCurrency(r.valorCaixa)}</td>
+                              <td className="p-2">
+                                {r.numeroParcelas}x de {toCurrency(r.valorParcela)}
+                              </td>
+                              <td className="p-2">
+                                {emprestimoStatusLabel[r.status] ?? r.status}
+                              </td>
+                              <td className="p-2">{formatTimeBR(r.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold">
                     Clientes cadastrados ({result.clientes.length})
                   </h3>
                   {result.clientes.length === 0 ? (

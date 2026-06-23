@@ -280,7 +280,16 @@ export async function renovarEmprestimo(
     });
 
     await syncEmprestimoStatus(emprestimoId, tx);
-    await registrarSaidaRenovacao(emprestimoId, valorLiberadoCaixa, tx);
+    await registrarSaidaRenovacao(
+      emprestimoId,
+      valorLiberadoCaixa,
+      {
+        valorCarteira: valorRenovacaoCarteira,
+        numeroParcelas: input.numeroParcelas,
+        valorParcela: input.valorParcela
+      },
+      tx
+    );
     return tx.emprestimo.findUnique({ where: { id: emprestimoId } });
   });
 

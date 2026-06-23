@@ -5,6 +5,7 @@ type Props = {
   data: {
     liberadoNovos: number;
     liberadoRenovacoes: number;
+    liberadoHoje: number;
     recebido: number;
     saldoAtual: number;
   };
@@ -12,6 +13,7 @@ type Props = {
 
 export function CaixaCards({ data }: Props) {
   const items = [
+    ["Liberado hoje", toCurrency(data.liberadoHoje)],
     ["Liberado em novos empréstimos", toCurrency(data.liberadoNovos)],
     ["Liberado em renovações", toCurrency(data.liberadoRenovacoes)],
     ["Recebido dos clientes", toCurrency(data.recebido)],
@@ -23,10 +25,11 @@ export function CaixaCards({ data }: Props) {
       <div>
         <h3 className="text-lg font-semibold tracking-tight">Gestão de Caixa</h3>
         <p className="text-sm text-muted-foreground">
-          Dinheiro que realmente entrou e saiu do seu bolso (mesmos recebimentos da Carteira)
+          Dinheiro que realmente entrou e saiu do seu bolso. Liberado em novos inclui histórico
+          (mesmo de contratos encerrados).
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {items.map(([title, value]) => (
           <Card key={title} className="border-t-2 border-t-emerald-500/70 transition-shadow hover:shadow-md">
             <CardHeader>

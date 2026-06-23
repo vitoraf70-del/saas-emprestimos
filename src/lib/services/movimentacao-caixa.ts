@@ -71,33 +71,47 @@ export async function registrarEntradaRecebimento(
   });
 }
 
-export async function getGestaoCaixaData() {
-  const [config, liberadoNovosAgg, liberadoRenovacoesAgg, recebidoAgg] = await Promise.all([
-    prisma.configCaixa.findUnique({ where: { id: "default" } }),
-    prisma.$queryRaw<{ total: Prisma.Decimal | null }[]>`
-      SELECT SUM(COALESCE(valor_principal_base, valor_emprestado)) AS total
-      FROM "Emprestimo"
-    `,
-    prisma.movimentacaoCaixa.aggregate({
-      where: { tipo: "renovacao" },
-      _sum: { valor: true }
-    }),
-    prisma.pagamento.aggregate({
-      where: { status: "confirmado" },
-      _sum: { valor_pago: true }
-    })
-  ]);
+export async function getGestaoCaixaData(dayKey?: string) {
+  const { calendarDayRangeCampoGrande, calendarDayKeyBR } = await import("@/lib/finance");
+  const hojeKey = dayKey ?? calendarDayKeyBR(new Date());
+  const { start, end } = calendarDayRangeCampoGrande(hojeKey);
+
+  const [config, liberadoNovosAgg, liberadoRenovacoesAgg, recebidoAgg, liberadoHojeAgg] =
+    await Promise.all([
+      prisma.configCaixa.findUnique({ where: { id: "default" } }),
+      prisma.movimentacaoCaixa.aggregate({
+        where: { tipo: "novo_emprestimo" },
+        _sum: { valor: true }
+      }),
+      prisma.movimentacaoCaixa.aggregate({
+        where: { tipo: "renovacao" },
+        _sum: { valor: true }
+      }),
+      prisma.pagamento.aggregate({
+        where: { status: "confirmado" },
+        _sum: { valor_pago: true }
+      }),
+      prisma.movimentacaoCaixa.aggregate({
+        where: {
+          created_at: { gte: start, lt: end },
+          tipo: { in: ["novo_emprestimo", "renovacao"] }
+        },
+        _sum: { valor: true }
+      })
+    ]);
 
   const saldoInicial = toNumber(config?.saldo_inicial);
-  const liberadoNovos = toNumber(liberadoNovosAgg[0]?.total);
+  const liberadoNovos = toNumber(liberadoNovosAgg._sum.valor);
   const liberadoRenovacoes = toNumber(liberadoRenovacoesAgg._sum.valor);
   const recebido = toNumber(recebidoAgg._sum.valor_pago);
+  const liberadoHoje = toNumber(liberadoHojeAgg._sum.valor);
   const saldoAtual = saldoInicial + recebido - liberadoNovos - liberadoRenovacoes;
 
   return {
     saldoInicial,
     liberadoNovos,
     liberadoRenovacoes,
+    liberadoHoje,
     recebido,
     saldoAtual
   };

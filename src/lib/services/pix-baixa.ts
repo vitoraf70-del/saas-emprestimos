@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { confirmPagamentoByTxid, type CobrancaPixLookup } from "@/lib/services/pixWebhookConfirm";
+import {
+  confirmPagamentoByTxid,
+  parseParcelaIdsFromSolicitacao,
+  type CobrancaPixLookup
+} from "@/lib/services/pixWebhookConfirm";
 
 export async function getCobrancaPixInfo(txid: string): Promise<CobrancaPixLookup | null> {
   const provider = (process.env.PIX_PROVIDER ?? "mercado_pago").toLowerCase();
@@ -38,14 +42,60 @@ export type VerificarBaixaResult = {
   statusBanco?: string;
 };
 
+/**
+ * Recupera pagamentos pagos no banco mas sem registro local (ex.: falha ao salvar Pagamento).
+ * Usa o pid/pids em solicitacaoPagador da cobrança CONCLUIDA no Inter/C6.
+ */
+export async function garantirPagamentoPorTxid(txid: string): Promise<boolean> {
+  const existente = await prisma.pagamento.findUnique({ where: { transaction_id: txid } });
+  if (existente) return true;
+
+  const info = await getCobrancaPixInfo(txid);
+  if (!info || info.status !== "CONCLUIDA") return false;
+
+  const parcelaIds = parseParcelaIdsFromSolicitacao(info.solicitacaoPagador);
+  if (parcelaIds.length === 0) return false;
+
+  const parcelas = await prisma.parcela.findMany({
+    where: { id: { in: parcelaIds }, status: { in: ["pendente", "vencida"] } }
+  });
+  if (parcelas.length === 0) return false;
+
+  const valorPago =
+    info.valorOriginal ??
+    parcelas.reduce((sum, p) => sum + Number(p.valor_atualizado || p.valor_original), 0);
+
+  await prisma.pagamento.create({
+    data: {
+      parcela_id: parcelaIds[0]!,
+      valor_pago: valorPago,
+      metodo: "pix",
+      transaction_id: txid,
+      status: "pendente"
+    }
+  });
+
+  return true;
+}
+
 export async function verificarEBaixarPagamento(txid: string): Promise<VerificarBaixaResult> {
-  const pagamento = await prisma.pagamento.findUnique({
+  let pagamento = await prisma.pagamento.findUnique({
     where: { transaction_id: txid },
     select: { status: true }
   });
 
   if (!pagamento) {
-    return { ok: false, baixado: false, motivo: "pagamento_nao_encontrado" };
+    const recuperado = await garantirPagamentoPorTxid(txid);
+    if (!recuperado) {
+      return { ok: false, baixado: false, motivo: "pagamento_nao_encontrado" };
+    }
+    pagamento = await prisma.pagamento.findUnique({
+      where: { transaction_id: txid },
+      select: { status: true }
+    });
+    if (!pagamento) {
+      return { ok: false, baixado: false, motivo: "pagamento_nao_encontrado" };
+    }
   }
 
   if (pagamento.status === "confirmado") {
@@ -76,7 +126,7 @@ export async function verificarEBaixarPagamento(txid: string): Promise<Verificar
 }
 
 /** Reconcilia pagamentos PIX pendentes consultando o banco (backup do webhook). */
-export async function reconciliarPagamentosPendentes(limit = 50) {
+export async function reconciliarPagamentosPendentes(limit = 200) {
   const { repararParcelasComPagamentoConfirmado } = await import("@/lib/services/parcelas-reparo");
   const reparo = await repararParcelasComPagamentoConfirmado();
 

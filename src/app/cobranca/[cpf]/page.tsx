@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { createPixCharge } from "@/lib/services/pix";
+import { gerarPixComRegistro } from "@/lib/services/pix-gerar";
 import { toCurrency } from "@/lib/utils";
 import { recalculateParcela } from "@/actions/parcelas";
 import { prisma } from "@/lib/prisma";
@@ -22,22 +22,13 @@ export default async function CobrancaPage({ params }: { params: { cpf: string }
   if (!parcela) return notFound();
 
   const atualizada = await recalculateParcela(parcela.id);
-  const pix = await createPixCharge({
-    transactionId: `parcela-${parcela.id}-${Date.now()}`,
+  const pix = await gerarPixComRegistro({
+    seed: `parcela-${parcela.id}-${Date.now()}`,
+    parcelaId: parcela.id,
     amount: Number(atualizada.valor_atualizado),
     description: `Parcela ${parcela.numero_parcela} | pid:${parcela.id}`,
     payerName: cliente.nome,
     payerCpf: cliente.cpf
-  });
-
-  await prisma.pagamento.create({
-    data: {
-      parcela_id: parcela.id,
-      valor_pago: atualizada.valor_atualizado,
-      metodo: "pix",
-      transaction_id: pix.transactionId,
-      status: "pendente"
-    }
   });
 
   return (

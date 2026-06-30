@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPixCharge } from "@/lib/services/pix";
+import { gerarPixComRegistro } from "@/lib/services/pix-gerar";
 import { prisma } from "@/lib/prisma";
 import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 
@@ -59,22 +59,13 @@ export async function POST(request: Request) {
     const solicitacaoPagador = `Quitacao ${atualizadas.length} parcelas`;
     const descricaoBase = `${solicitacaoPagador} | pids:${parcelaIdsJoin}`;
     const description = descricaoBase.slice(0, 140);
-    const pix = await createPixCharge({
-      transactionId: `public-quitacao-${cliente.id}-${Date.now()}`,
+    const pix = await gerarPixComRegistro({
+      seed: `public-quitacao-${cliente.id}-${Date.now()}`,
+      parcelaId: atualizadas[0]!.id,
       amount: Number(valorTotal.toFixed(2)),
       description,
       payerName: cliente.nome,
       payerCpf: cliente.cpf.replace(/\D/g, "")
-    });
-
-    await prisma.pagamento.create({
-      data: {
-        parcela_id: atualizadas[0].id,
-        valor_pago: valorTotal,
-        metodo: "pix",
-        transaction_id: pix.transactionId,
-        status: "pendente"
-      }
     });
 
     return NextResponse.json({

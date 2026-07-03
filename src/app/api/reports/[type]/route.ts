@@ -340,51 +340,92 @@ async function buildParcelasAtrasadas(): Promise<ReportData> {
       emprestimo: {
         select: {
           frequencia_parcela: true,
-          cliente: { select: { nome: true, endereco: true, whatsapp: true } }
+          cliente: { select: { id: true, nome: true, endereco: true, whatsapp: true } }
         }
       }
     },
     orderBy: { vencimento: "asc" }
   });
 
-  const rows = parcelas
-    .map((p) => {
-      const dias = diasAtraso(p.vencimento);
-      if (dias <= 0) return null;
-      const calc = calcularParcelaComIsencao(
-        Number(p.valor_original),
-        dias,
-        p.emprestimo.frequencia_parcela,
-        p.encargos_isentos,
-        p.juros_isentos
-      );
+  type Agg = {
+    nome: string;
+    endereco: string;
+    whatsapp: string;
+    numeros: number[];
+    diasAtrasoMax: number;
+    primeiroVencimento: Date;
+    totalDevido: number;
+  };
+
+  const porCliente = new Map<string, Agg>();
+
+  for (const p of parcelas) {
+    const dias = diasAtraso(p.vencimento);
+    if (dias <= 0) continue;
+
+    const calc = calcularParcelaComIsencao(
+      Number(p.valor_original),
+      dias,
+      p.emprestimo.frequencia_parcela,
+      p.encargos_isentos,
+      p.juros_isentos
+    );
+
+    const cliente = p.emprestimo.cliente;
+    const atual = porCliente.get(cliente.id) ?? {
+      nome: cliente.nome,
+      endereco: cliente.endereco,
+      whatsapp: cliente.whatsapp,
+      numeros: [],
+      diasAtrasoMax: 0,
+      primeiroVencimento: p.vencimento,
+      totalDevido: 0
+    };
+    atual.numeros.push(p.numero_parcela);
+    atual.diasAtrasoMax = Math.max(atual.diasAtrasoMax, dias);
+    if (p.vencimento < atual.primeiroVencimento) atual.primeiroVencimento = p.vencimento;
+    atual.totalDevido += calc.valorAtualizado;
+    porCliente.set(cliente.id, atual);
+  }
+
+  const rows = [...porCliente.values()]
+    .sort((a, b) => b.diasAtrasoMax - a.diasAtrasoMax)
+    .map((c) => {
+      const ordenados = [...c.numeros].sort((a, b) => a - b);
+      const listaNumeros = ordenados.join(", ");
       return {
-        dias,
-        row: {
-          Cliente: p.emprestimo.cliente.nome,
-          Endereco: p.emprestimo.cliente.endereco,
-          WhatsApp: p.emprestimo.cliente.whatsapp,
-          Parcela: p.numero_parcela,
-          Vencimento: formatDateBR(p.vencimento),
-          "Dias em atraso": dias,
-          "Valor atualizado": toCurrency(calc.valorAtualizado)
-        }
+        Cliente: c.nome,
+        Endereco: c.endereco,
+        WhatsApp: c.whatsapp,
+        "Parcelas em atraso":
+          ordenados.length === 1
+            ? `1 (nº ${listaNumeros})`
+            : `${ordenados.length} (nº ${listaNumeros})`,
+        "1º vencimento": formatDateBR(c.primeiroVencimento),
+        "Dias em atraso": c.diasAtrasoMax,
+        "Total devido": toCurrency(c.totalDevido)
       };
-    })
-    .filter((r): r is NonNullable<typeof r> => r !== null)
-    .sort((a, b) => b.dias - a.dias)
-    .map((r) => r.row);
+    });
+
+  const totalGeral = [...porCliente.values()].reduce((acc, c) => acc + c.totalDevido, 0);
+  const parcelasTotal = [...porCliente.values()].reduce((acc, c) => acc + c.numeros.length, 0);
 
   return {
     title: "Parcelas atrasadas",
+    subtitle: "Agrupado por cliente — quantidade e números das parcelas em atraso",
+    summary: [
+      { label: "Clientes em atraso", value: String(rows.length) },
+      { label: "Parcelas vencidas", value: String(parcelasTotal) },
+      { label: "Total a receber", value: toCurrency(totalGeral) }
+    ],
     columns: [
       { key: "Cliente", label: "Cliente", width: 140 },
-      { key: "Endereco", label: "Endereço", width: 200 },
+      { key: "Endereco", label: "Endereço", width: 190 },
       { key: "WhatsApp", label: "WhatsApp", width: 95 },
-      { key: "Parcela", label: "Parc.", width: 45, align: "right" },
-      { key: "Vencimento", label: "Vencimento", width: 75 },
+      { key: "Parcelas em atraso", label: "Parcelas em atraso", width: 120 },
+      { key: "1º vencimento", label: "1º vencimento", width: 80 },
       { key: "Dias em atraso", label: "Dias", width: 45, align: "right" },
-      { key: "Valor atualizado", label: "Valor", width: 85, align: "right" }
+      { key: "Total devido", label: "Total devido", width: 85, align: "right" }
     ],
     rows
   };

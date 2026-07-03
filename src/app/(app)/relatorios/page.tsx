@@ -20,7 +20,7 @@ export default function RelatoriosPage() {
               <CardTitle className="capitalize">{name.replace("-", " ")}</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Button asChild variant="outline"><a href={`/api/reports/${name}?format=pdf`}>Exportar PDF</a></Button>
+              <Button asChild variant="outline"><a href={`/api/reports/${name}?format=view`} target="_blank" rel="noopener noreferrer">Abrir / Imprimir</a></Button>
               <Button asChild><a href={`/api/reports/${name}?format=excel`}>Exportar Excel</a></Button>
             </CardContent>
           </Card>

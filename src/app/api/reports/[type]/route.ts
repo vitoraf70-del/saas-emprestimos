@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import PDFDocument from "pdfkit";
 import { prisma } from "@/lib/prisma";
 import { calcularParcelaComIsencao, diasAtraso } from "@/lib/finance";
 import { formatDateBR } from "@/lib/date";
@@ -31,7 +30,7 @@ export async function GET(request: Request, { params }: { params: { type: string
     if (format === "excel") {
       return await exportExcel(report, params.type);
     }
-    return await exportPdf(report, params.type);
+    return exportHtml(report);
   } catch (error) {
     console.error(`[GET /api/reports/${params.type}]`, error);
     return NextResponse.json(
@@ -62,83 +61,88 @@ async function exportExcel(report: ReportData, type: string) {
   });
 }
 
-async function exportPdf(report: ReportData, type: string) {
-  const doc = new PDFDocument({ margin: 28, size: "A4", layout: "landscape" });
-  const chunks: Buffer[] = [];
-  doc.on("data", (chunk) => chunks.push(chunk));
-  const done = new Promise<void>((resolve) => doc.on("end", () => resolve()));
+function escapeHtml(value: string | number) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-  const left = doc.page.margins.left;
-  const right = doc.page.width - doc.page.margins.right;
+function exportHtml(report: ReportData) {
+  const gerado = formatDateBR(new Date());
 
-  doc.fontSize(16).font("Helvetica-Bold").text(report.title);
-  doc
-    .fontSize(9)
-    .font("Helvetica")
-    .fillColor("#666")
-    .text(`Gerado em ${formatDateBR(new Date())} — ${report.rows.length} registro(s)`);
-  doc.fillColor("#000").moveDown(0.5);
+  const headerCells = report.columns
+    .map(
+      (col) =>
+        `<th style="text-align:${col.align ?? "left"}">${escapeHtml(col.label)}</th>`
+    )
+    .join("");
 
-  const drawHeader = () => {
-    let x = left;
-    doc.fontSize(9).font("Helvetica-Bold");
-    for (const col of report.columns) {
-      doc.text(col.label, x, doc.y, {
-        width: col.width,
-        align: col.align ?? "left",
-        continued: false,
-        lineBreak: false
-      });
-      x += col.width;
-    }
-    doc.moveDown(0.3);
-    doc
-      .moveTo(left, doc.y)
-      .lineTo(right, doc.y)
-      .strokeColor("#ccc")
-      .stroke();
-    doc.moveDown(0.2);
-  };
+  const bodyRows = report.rows
+    .map((row) => {
+      const cells = report.columns
+        .map((col) => {
+          const raw = row[col.key] ?? "";
+          let content = escapeHtml(raw);
+          if (col.key === "WhatsApp" && raw) {
+            const digits = String(raw).replace(/\D/g, "");
+            const full = digits.startsWith("55") ? digits : `55${digits}`;
+            content = `<a href="https://wa.me/${full}" target="_blank" rel="noopener">${escapeHtml(raw)}</a>`;
+          }
+          return `<td style="text-align:${col.align ?? "left"}">${content}</td>`;
+        })
+        .join("");
+      return `<tr>${cells}</tr>`;
+    })
+    .join("");
 
-  drawHeader();
-  doc.font("Helvetica").fontSize(9);
+  const empty = report.rows.length === 0
+    ? `<p class="empty">Nenhum registro encontrado.</p>`
+    : "";
 
-  for (const row of report.rows) {
-    const rowHeights = report.columns.map((col) =>
-      doc.heightOfString(String(row[col.key] ?? ""), { width: col.width })
-    );
-    const rowHeight = Math.max(...rowHeights, 12);
-
-    if (doc.y + rowHeight > doc.page.height - doc.page.margins.bottom) {
-      doc.addPage();
-      drawHeader();
-      doc.font("Helvetica").fontSize(9);
-    }
-
-    const y = doc.y;
-    let x = left;
-    for (const col of report.columns) {
-      doc.text(String(row[col.key] ?? ""), x, y, {
-        width: col.width,
-        align: col.align ?? "left"
-      });
-      x += col.width;
-    }
-    doc.y = y + rowHeight + 4;
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(report.title)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #111; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+  h1 { font-size: 20px; margin: 0; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 16px; }
+  button { background: #1e3a5f; color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #e2e2e2; vertical-align: top; }
+  th { background: #f4f5f7; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  a { color: #1e3a5f; }
+  .empty { color: #666; margin-top: 24px; }
+  @media print {
+    button { display: none; }
+    body { margin: 0; }
+    th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <h1>${escapeHtml(report.title)}</h1>
+    <button onclick="window.print()">Imprimir / Salvar PDF</button>
+  </div>
+  <div class="meta">Gerado em ${gerado} — ${report.rows.length} registro(s)</div>
+  <table>
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+  ${empty}
+</body>
+</html>`;
 
-  if (report.rows.length === 0) {
-    doc.moveDown().fontSize(11).text("Nenhum registro encontrado.");
-  }
-
-  doc.end();
-  await done;
-
-  return new NextResponse(Buffer.concat(chunks), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename=${type}.pdf`
-    }
+  return new NextResponse(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" }
   });
 }
 

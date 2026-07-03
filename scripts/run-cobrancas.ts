@@ -1,3 +1,9 @@
+// Disparo manual: força o domínio público para o link do WhatsApp NUNCA sair
+// com o IP da rede local (NEXT_PUBLIC_APP_URL do .env de dev). Sobrescreva com
+// APP_URL_OVERRIDE se rodar em outro ambiente.
+process.env.NEXT_PUBLIC_APP_URL =
+  process.env.APP_URL_OVERRIDE ?? "https://crediarioms.com";
+
 import {
   contarCobrancasPendentes,
   processarCobrancaAutomatica

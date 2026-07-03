@@ -11,6 +11,7 @@ import {
   processarCobrancaAutomatica
 } from "@/lib/services/cobranca-automatica";
 import { expirarCortesiaEncargos } from "@/lib/services/cortesia-encargos";
+import { notificarCobrador } from "@/lib/services/notificar-cobrador";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -33,8 +34,10 @@ export async function GET(request: Request) {
   const isContinuation = continuationDepth > 0;
 
   let cortesia: Awaited<ReturnType<typeof expirarCortesiaEncargos>> | null = null;
+  let cobrador: Awaited<ReturnType<typeof notificarCobrador>> | null = null;
   if (!isContinuation) {
     cortesia = await expirarCortesiaEncargos();
+    cobrador = await notificarCobrador();
   }
 
   const cobranca = await processarCobrancaAutomatica();
@@ -62,6 +65,7 @@ export async function GET(request: Request) {
     continuationDepth,
     continuacaoAgendada: deveContinuar,
     cortesia: cortesia ?? { ignorado: "continuação" },
+    cobrador: cobrador ?? { ignorado: "continuação" },
     cobranca: { ...cobranca, filaRestante: aindaPendentes },
     pixBaixa: pixBaixa ?? { ignorado: "continuação — só cobrança WhatsApp" },
     parcelas: parcelas ?? { atualizadas: false, ignorado: "continuação" }

@@ -2,7 +2,23 @@
   "crons": [
     {
       "path": "/api/cron/pix-baixa",
-      "schedule": "0 12 * * *"
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cobrancas",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/cobrancas",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/cobrancas",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cobrancas",
+      "schedule": "40 3 * * *"
     },
     {
       "path": "/api/cron/cobrancas",

@@ -16,8 +16,10 @@ type Column = {
 
 type ReportData = {
   title: string;
+  subtitle?: string;
   columns: Column[];
   rows: Record<string, string | number>[];
+  summary?: { label: string; value: string }[];
 };
 
 export async function GET(request: Request, { params }: { params: { type: string } }) {
@@ -42,21 +44,40 @@ export async function GET(request: Request, { params }: { params: { type: string
 
 async function exportExcel(report: ReportData, type: string) {
   const workbook = new ExcelJS.Workbook();
-  const ws = workbook.addWorksheet("Relatorio");
+  workbook.creator = "PV Soluções";
+  workbook.created = new Date();
+
+  const ws = workbook.addWorksheet("Relatório");
   ws.columns = report.columns.map((col) => ({
     header: col.label,
     key: col.key,
-    width: Math.max(12, Math.round(col.width / 6))
+    width: Math.max(14, Math.round(col.width / 5))
   }));
-  ws.getRow(1).font = { bold: true };
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FF050A18" } };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD4AF37" }
+  };
+  headerRow.alignment = { vertical: "middle" };
+  headerRow.height = 22;
+
   report.rows.forEach((row) => ws.addRow(row));
+
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: report.columns.length }
+  };
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new NextResponse(buffer, {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename=${type}.xlsx`
+      "Content-Disposition": `attachment; filename="pv-solucoes-${type}.xlsx"`
     }
   });
 }
@@ -69,8 +90,21 @@ function escapeHtml(value: string | number) {
     .replace(/"/g, "&quot;");
 }
 
+function rowClass(row: Record<string, string | number>) {
+  const dias = Number(row["Dias em atraso"]);
+  if (!Number.isFinite(dias)) return "";
+  if (dias >= 15) return "row-critical";
+  if (dias >= 7) return "row-warning";
+  return "";
+}
+
 function exportHtml(report: ReportData) {
   const gerado = formatDateBR(new Date());
+  const hora = new Date().toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Campo_Grande"
+  });
 
   const headerCells = report.columns
     .map(
@@ -81,6 +115,7 @@ function exportHtml(report: ReportData) {
 
   const bodyRows = report.rows
     .map((row) => {
+      const cls = rowClass(row);
       const cells = report.columns
         .map((col) => {
           const raw = row[col.key] ?? "";
@@ -93,12 +128,19 @@ function exportHtml(report: ReportData) {
           return `<td style="text-align:${col.align ?? "left"}">${content}</td>`;
         })
         .join("");
-      return `<tr>${cells}</tr>`;
+      return `<tr class="${cls}">${cells}</tr>`;
     })
     .join("");
 
+  const summaryHtml = (report.summary ?? [])
+    .map(
+      (s) =>
+        `<div class="stat"><span class="stat-label">${escapeHtml(s.label)}</span><strong class="stat-value">${escapeHtml(s.value)}</strong></div>`
+    )
+    .join("");
+
   const empty = report.rows.length === 0
-    ? `<p class="empty">Nenhum registro encontrado.</p>`
+    ? `<p class="empty">Nenhum registro encontrado para este relatório.</p>`
     : "";
 
   const html = `<!DOCTYPE html>
@@ -106,38 +148,70 @@ function exportHtml(report: ReportData) {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(report.title)}</title>
+<title>${escapeHtml(report.title)} — PV Soluções</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #111; }
-  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
-  h1 { font-size: 20px; margin: 0; }
-  .meta { color: #666; font-size: 13px; margin-bottom: 16px; }
-  button { background: #1e3a5f; color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; margin: 0; color: #0a192f; background: #f4f6f9; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 40px; }
+  .brand { background: linear-gradient(135deg, #050a18 0%, #0a192f 55%, #0f2744 100%); color: #fff; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+  .brand-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand-name { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #d4af37; font-weight: 700; }
+  .brand h1 { margin: 6px 0 0; font-size: 22px; font-weight: 700; }
+  .brand p { margin: 6px 0 0; color: #c8d4e8; font-size: 13px; }
+  .actions { display: flex; gap: 8px; }
+  button { background: linear-gradient(135deg, #d4af37, #b8941f); color: #050a18; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button:hover { filter: brightness(1.05); }
+  .meta { color: #5c6b82; font-size: 12px; margin-bottom: 16px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .stat { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+  .stat-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 4px; }
+  .stat-value { font-size: 20px; color: #0a192f; }
+  .table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 10px; border-bottom: 1px solid #e2e2e2; vertical-align: top; }
-  th { background: #f4f5f7; font-weight: 600; }
-  tr:nth-child(even) td { background: #fafafa; }
-  a { color: #1e3a5f; }
-  .empty { color: #666; margin-top: 24px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+  th { background: #0a192f; color: #fff; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.row-warning td { background: #fffbeb; }
+  tr.row-critical td { background: #fef2f2; }
+  a { color: #0a192f; font-weight: 600; text-decoration: underline; }
+  .empty { color: #64748b; padding: 32px; text-align: center; }
+  .footer { margin-top: 18px; font-size: 11px; color: #94a3b8; text-align: center; }
   @media print {
-    button { display: none; }
-    body { margin: 0; }
-    th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; }
+    .page { padding: 0; max-width: none; }
+    .actions, button { display: none !important; }
+    .brand { border-radius: 0; }
+    .table-wrap { border: none; border-radius: 0; }
+    th { background: #0a192f !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tr.row-warning td, tr.row-critical td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
 <body>
-  <div class="bar">
-    <h1>${escapeHtml(report.title)}</h1>
-    <button onclick="window.print()">Imprimir / Salvar PDF</button>
+  <div class="page">
+    <header class="brand">
+      <div class="brand-top">
+        <div>
+          <div class="brand-name">PV Soluções</div>
+          <h1>${escapeHtml(report.title)}</h1>
+          ${report.subtitle ? `<p>${escapeHtml(report.subtitle)}</p>` : ""}
+        </div>
+        <div class="actions">
+          <button type="button" onclick="window.print()">Imprimir / Salvar PDF</button>
+        </div>
+      </div>
+    </header>
+    <div class="meta">Gerado em ${gerado} às ${hora} (Campo Grande) · ${report.rows.length} registro(s)</div>
+    ${summaryHtml ? `<div class="summary">${summaryHtml}</div>` : ""}
+    <div class="table-wrap">
+      <table>
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      ${empty}
+    </div>
+    <div class="footer">PV Soluções · crediarioms.com · Relatório confidencial para uso interno</div>
   </div>
-  <div class="meta">Gerado em ${gerado} — ${report.rows.length} registro(s)</div>
-  <table>
-    <thead><tr>${headerCells}</tr></thead>
-    <tbody>${bodyRows}</tbody>
-  </table>
-  ${empty}
 </body>
 </html>`;
 
@@ -231,8 +305,17 @@ async function buildInadimplencia(): Promise<ReportData> {
       "Total devido": toCurrency(c.totalDevido)
     }));
 
+  const totalGeral = [...porCliente.values()].reduce((acc, c) => acc + c.totalDevido, 0);
+  const parcelasTotal = [...porCliente.values()].reduce((acc, c) => acc + c.parcelasVencidas, 0);
+
   return {
-    title: "Inadimplência — clientes em atraso",
+    title: "Inadimplência",
+    subtitle: "Clientes em atraso — dados para cobrança presencial",
+    summary: [
+      { label: "Clientes em atraso", value: String(rows.length) },
+      { label: "Parcelas vencidas", value: String(parcelasTotal) },
+      { label: "Total a receber", value: toCurrency(totalGeral) }
+    ],
     columns: [
       { key: "Cliente", label: "Cliente", width: 150 },
       { key: "Endereco", label: "Endereço", width: 250 },

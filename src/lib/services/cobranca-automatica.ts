@@ -17,7 +17,7 @@ import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 
-const MAX_AVISOS_VENCIMENTO = 3;
+const MAX_AVISOS_VENCIMENTO = 4;
 const VENCIMENTO_JANELA_DIAS_ANTES = 5;
 const VENCIMENTO_JANELA_DIAS_ATRASO = 120;
 
@@ -87,7 +87,7 @@ function isJanelaAntecipado(hoje: Date) {
 
 function isJanelaVencimento(hoje: Date) {
   const { hour, minute } = getCampoGrandeClock(hoje);
-  if (hour === 14 || hour === 20) return true;
+  if (hour === 14 || hour === 17 || hour === 20) return true;
   return hour === 23 && minute >= 35;
 }
 
@@ -139,7 +139,7 @@ function detectarFase(
 
   if (diasParaVencerValor === 0) {
     if (!isJanelaVencimento(hoje)) {
-      return { fase: null, motivo: "vencimento: fora do horário (14:00, 20:00 ou 23:40)" };
+      return { fase: null, motivo: "vencimento: fora do horário (14:00, 17:00, 20:00 ou 23:40)" };
     }
     if (avisosVencimento >= MAX_AVISOS_VENCIMENTO) {
       return { fase: null, motivo: "vencimento: limite de avisos atingido" };

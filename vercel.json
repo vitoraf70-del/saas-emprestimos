@@ -10,6 +10,10 @@
     },
     {
       "path": "/api/cron/cobrancas",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/cobrancas",
       "schedule": "0 23 * * *"
     },
     {

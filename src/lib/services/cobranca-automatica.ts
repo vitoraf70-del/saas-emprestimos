@@ -85,10 +85,18 @@ function isJanelaAntecipado(hoje: Date) {
   return getCampoGrandeClock(hoje).hour === 19;
 }
 
-function isJanelaVencimento(hoje: Date) {
+/** Índice da janela de cobrança do dia: 14h=0, 17h=1, 20h=2, 23h40=3. null fora delas. */
+function avisoWindowIndex(hoje: Date): number | null {
   const { hour, minute } = getCampoGrandeClock(hoje);
-  if (hour === 14 || hour === 17 || hour === 20) return true;
-  return hour === 23 && minute >= 35;
+  if (hour === 14) return 0;
+  if (hour === 17) return 1;
+  if (hour === 20) return 2;
+  if (hour === 23 && minute >= 35) return 3;
+  return null;
+}
+
+function isJanelaVencimento(hoje: Date) {
+  return avisoWindowIndex(hoje) !== null;
 }
 
 function detectarFase(
@@ -101,8 +109,16 @@ function detectarFase(
   frequenciaParcela: FrequenciaParcela
 ): { fase: FaseCobranca | null; motivo?: string } {
   if (diasAtrasoValor > 0) {
-    if (ultimoAviso && isSameCalendarDayBR(ultimoAviso, hoje)) {
-      return { fase: null, motivo: "atraso: já avisado hoje" };
+    const janela = avisoWindowIndex(hoje);
+    if (janela === null) {
+      return { fase: null, motivo: "atraso: fora do horário (14:00, 17:00, 20:00 ou 23:40)" };
+    }
+    if (
+      ultimoAviso &&
+      isSameCalendarDayBR(ultimoAviso, hoje) &&
+      avisoWindowIndex(ultimoAviso) === janela
+    ) {
+      return { fase: null, motivo: "atraso: já avisado nesta janela" };
     }
     return { fase: "atraso" };
   }

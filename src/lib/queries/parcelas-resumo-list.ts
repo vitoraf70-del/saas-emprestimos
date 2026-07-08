@@ -268,7 +268,8 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
         juros: calc.jurosValor,
         encargosIsentos: parcela.encargos_isentos,
         jurosIsentos: parcela.juros_isentos,
-        status: parcela.status
+        // Status na tela segue o atraso real (evita "pendente" com multa/juros).
+        status: calc.diasAtraso > 0 ? "vencida" : parcela.status === "vencida" ? "pendente" : parcela.status
       });
       parcelasAbertasPorEmprestimo.set(parcela.emprestimo_id, current);
     }

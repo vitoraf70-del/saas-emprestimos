@@ -56,13 +56,37 @@ type SendJob = {
 };
 
 function getConcurrency() {
-  const raw = Number(process.env.COBRANCA_CONCURRENCY ?? "8");
-  return Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 20) : 8;
+  const raw = Number(process.env.COBRANCA_CONCURRENCY ?? "12");
+  return Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 20) : 12;
 }
 
 function getDeadlineMs(override?: number) {
-  const raw = override ?? Number(process.env.COBRANCA_DEADLINE_MS ?? "48000");
-  return Number.isFinite(raw) && raw > 5000 ? Math.min(Math.floor(raw), 55000) : 48000;
+  const raw = override ?? Number(process.env.COBRANCA_DEADLINE_MS ?? "55000");
+  return Number.isFinite(raw) && raw > 5000 ? Math.min(Math.floor(raw), 55000) : 55000;
+}
+
+const FASE_PRIORITY: Record<FaseCobranca, number> = {
+  vencimento: 0,
+  antecipado: 1,
+  atraso: 2
+};
+
+/** Quem está há mais tempo sem aviso vai primeiro; ninguém fica sempre no fim da fila. */
+function sortSendJobsPorPrioridade(jobs: SendJob[]) {
+  jobs.sort((a, b) => {
+    const faseDiff = FASE_PRIORITY[a.fase] - FASE_PRIORITY[b.fase];
+    if (faseDiff !== 0) return faseDiff;
+
+    const au = a.parcela.ultimo_aviso_em?.getTime() ?? 0;
+    const bu = b.parcela.ultimo_aviso_em?.getTime() ?? 0;
+    if (au !== bu) return au - bu;
+
+    if (a.fase === "atraso" && b.fase === "atraso") {
+      return a.diasAtrasoValor - b.diasAtrasoValor;
+    }
+
+    return a.parcela.vencimento.getTime() - b.parcela.vencimento.getTime();
+  });
 }
 
 function buildPaymentLink() {
@@ -93,10 +117,6 @@ function avisoWindowIndex(hoje: Date): number | null {
   if (hour === 20) return 2;
   if (hour === 23 && minute >= 35) return 3;
   return null;
-}
-
-function isJanelaVencimento(hoje: Date) {
-  return avisoWindowIndex(hoje) !== null;
 }
 
 function detectarFase(
@@ -154,8 +174,16 @@ function detectarFase(
   }
 
   if (diasParaVencerValor === 0) {
-    if (!isJanelaVencimento(hoje)) {
+    const janela = avisoWindowIndex(hoje);
+    if (janela === null) {
       return { fase: null, motivo: "vencimento: fora do horário (14:00, 17:00, 20:00 ou 23:40)" };
+    }
+    if (
+      ultimoAviso &&
+      isSameCalendarDayBR(ultimoAviso, hoje) &&
+      avisoWindowIndex(ultimoAviso) === janela
+    ) {
+      return { fase: null, motivo: "vencimento: já avisado nesta janela" };
     }
     if (avisosVencimento >= MAX_AVISOS_VENCIMENTO) {
       return { fase: null, motivo: "vencimento: limite de avisos atingido" };
@@ -285,12 +313,21 @@ async function atualizarCalculoParcela(
 
 async function executarEnvio(job: SendJob, hoje: Date, linkPagamento: string) {
   const { parcela, fase } = job;
+  const calc = calcularParcelaComIsencao(
+    Number(parcela.valor_original),
+    job.diasAtrasoValor,
+    parcela.emprestimo.frequencia_parcela,
+    parcela.encargos_isentos,
+    parcela.juros_isentos
+  );
+  await atualizarCalculoParcela(parcela, hoje, job.diasAtrasoValor, calc);
+
   const cliente = parcela.emprestimo.cliente;
   const message = montarMensagem({
     nome: cliente.nome,
     numeroParcela: parcela.numero_parcela,
     vencimento: parcela.vencimento,
-    valorAtualizado: job.valorAtualizado,
+    valorAtualizado: calc.valorAtualizado,
     linkPagamento,
     fase,
     diasAtrasoValor: job.diasAtrasoValor,
@@ -326,7 +363,7 @@ export async function processarCobrancaAutomatica(
   const sendJobs: SendJob[] = [];
   const linkPagamento = buildPaymentLink();
 
-  await runWithConcurrency(parcelas, 12, async (parcela) => {
+  for (const parcela of parcelas) {
     resultado.processadas++;
     const diasAtrasoValor = diasAtraso(parcela.vencimento, hoje);
     const diasParaVencerValor = diasParaVencer(parcela.vencimento, hoje);
@@ -337,8 +374,6 @@ export async function processarCobrancaAutomatica(
       parcela.encargos_isentos,
       parcela.juros_isentos
     );
-
-    await atualizarCalculoParcela(parcela, hoje, diasAtrasoValor, calc);
 
     const { fase, motivo } = detectarFase(
       diasParaVencerValor,
@@ -353,13 +388,15 @@ export async function processarCobrancaAutomatica(
     if (!fase) {
       resultado.ignoradas++;
       resultado.detalhes.push({ parcelaId: parcela.id, fase: "nenhuma", motivo });
-      return;
+      continue;
     }
 
     sendJobs.push(
       buildSendJob(parcela, fase, diasParaVencerValor, diasAtrasoValor, calc.valorAtualizado, hoje)
     );
-  });
+  }
+
+  sortSendJobsPorPrioridade(sendJobs);
 
   let jobsStarted = 0;
 

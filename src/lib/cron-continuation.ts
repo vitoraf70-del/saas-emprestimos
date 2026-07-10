@@ -11,7 +11,7 @@ export function canScheduleContinuation(depth: number) {
   return depth < MAX_CONTINUATION_DEPTH;
 }
 
-export function scheduleCronContinuation(request: Request, depth: number) {
+export async function scheduleCronContinuation(request: Request, depth: number) {
   const secret = process.env.CRON_SECRET?.trim();
   const base = getCronBaseUrl(request);
   const url = new URL(`${base}/api/cron/cobrancas`);
@@ -20,11 +20,20 @@ export function scheduleCronContinuation(request: Request, depth: number) {
     url.searchParams.set("secret", secret);
   }
 
-  fetch(url.toString(), {
-    method: "GET",
-    cache: "no-store",
-    headers: secret ? { Authorization: `Bearer ${secret}` } : undefined
-  }).catch(() => {});
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    await fetch(url.toString(), {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: secret ? { Authorization: `Bearer ${secret}` } : undefined
+    });
+  } catch {
+    // Próxima janela de horário tenta de novo se a continuação falhar.
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function getCronBaseUrl(request: Request) {

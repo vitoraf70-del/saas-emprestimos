@@ -285,8 +285,10 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
 
   const cliente = await findClienteByTelefone(telefone);
 
+  // Cliente já cadastrado: o dono atende manualmente — bot NÃO responde nada.
   if (cliente) {
     await avisarInadimplenteSeNecessario(telefone, cliente);
+    return;
   }
 
   if (cmd === "cadastro" || cmd === "quero cadastrar" || cmd === "novo cadastro") {
@@ -296,46 +298,15 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
   }
 
   if (cmd === "menu" || cmd === "oi" || cmd === "olá" || cmd === "ola" || cmd === "ajuda") {
-    const resposta = cliente ? await resumoClienteExistente(cliente) : menuInicial();
-    await sendWhatsAppMessage({ phone: telefone, message: resposta });
+    await sendWhatsAppMessage({ phone: telefone, message: menuInicial() });
     return;
   }
 
-  if (cliente && (cmd === "pagar" || cmd === "pix" || cmd === "pagamento")) {
-    const link = buildPagarLink();
-    await sendWhatsAppMessage({
-      phone: telefone,
-      message: `Link para pagamento:${formatLinkPagamentoWhatsApp(link)}`
-    });
-    return;
+  if (isAiEnabled()) {
+    const tratou = await processarLeadComIA(telefone, texto, msg.pushName);
+    if (tratou) return;
   }
 
-  if (cliente && (cmd === "saldo" || cmd === "quanto devo" || cmd === "devo")) {
-    const parcelas = cliente.emprestimos.flatMap((e) => e.parcelas);
-    const abertas = parcelas.filter((p) => p.status !== "paga");
-    const saldo = abertas.reduce(
-      (acc, p) => acc + Number(p.valor_atualizado || p.valor_original),
-      0
-    );
-    await sendWhatsAppMessage({
-      phone: telefone,
-      message: `Seu saldo em aberto é *${toCurrency(saldo)}*.\n\nPara pagar, digite *pagar*.`
-    });
-    return;
-  }
-
-  if (!cliente) {
-    if (isAiEnabled()) {
-      const tratou = await processarLeadComIA(telefone, texto, msg.pushName);
-      if (tratou) return;
-    }
-    const resposta = await iniciarCadastro(telefone, msg.pushName);
-    await sendWhatsAppMessage({ phone: telefone, message: resposta });
-    return;
-  }
-
-  await sendWhatsAppMessage({
-    phone: telefone,
-    message: "Não entendi. Digite *menu*, *pagar*, *saldo* ou *cadastro*."
-  });
+  const resposta = await iniciarCadastro(telefone, msg.pushName);
+  await sendWhatsAppMessage({ phone: telefone, message: resposta });
 }

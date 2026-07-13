@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { labelOcupacao, mensagemMenuOcupacao, parseOcupacaoResposta } from "@/lib/ocupacao";
 import { formatBrazilPhone, toCurrency } from "@/lib/utils";
+import { isAiEnabled } from "@/lib/services/ai-chat";
 import { sendWhatsAppMessage, normalizeWhatsAppDigits } from "@/lib/services/whatsapp";
+import {
+  avisarInadimplenteSeNecessario,
+  ETAPA_IA,
+  processarLeadComIA
+} from "@/lib/services/whatsapp-ia-lead";
 import type { InboundWhatsAppMessage } from "@/lib/services/whatsapp-inbound";
 
 type CadastroDados = {
@@ -228,6 +234,17 @@ async function finalizarCadastro(telefone: string, dados: CadastroDados) {
 }
 
 function menuInicial() {
+  if (isAiEnabled()) {
+    return [
+      "Olá! Sou o assistente do crediário.",
+      "",
+      "Posso ajudar com análise de crédito, saldo e pagamento.",
+      "Me conte o que você precisa ou digite:",
+      "• *pagar* — link de pagamento (clientes)",
+      "• *saldo* — valor em aberto",
+      "• *menu* — ver opções"
+    ].join("\n");
+  }
   return [
     "Olá! Sou o assistente do crediário.",
     "",
@@ -257,13 +274,20 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
   }
 
   const conversa = await prisma.whatsappConversa.findUnique({ where: { telefone } });
-  if (conversa && conversa.etapa !== "concluido") {
+  const emCadastroManual =
+    conversa && conversa.etapa !== "concluido" && conversa.etapa !== ETAPA_IA && conversa.etapa !== "cliente";
+
+  if (emCadastroManual) {
     const resposta = await fluxoCadastro(conversa, texto);
     await sendWhatsAppMessage({ phone: telefone, message: resposta });
     return;
   }
 
   const cliente = await findClienteByTelefone(telefone);
+
+  if (cliente) {
+    await avisarInadimplenteSeNecessario(telefone, cliente);
+  }
 
   if (cmd === "cadastro" || cmd === "quero cadastrar" || cmd === "novo cadastro") {
     const resposta = await iniciarCadastro(telefone, msg.pushName);
@@ -300,7 +324,11 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
     return;
   }
 
-  if (!cliente && !conversa) {
+  if (!cliente) {
+    if (isAiEnabled()) {
+      const tratou = await processarLeadComIA(telefone, texto, msg.pushName);
+      if (tratou) return;
+    }
     const resposta = await iniciarCadastro(telefone, msg.pushName);
     await sendWhatsAppMessage({ phone: telefone, message: resposta });
     return;
@@ -308,8 +336,6 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
 
   await sendWhatsAppMessage({
     phone: telefone,
-    message: cliente
-      ? "Não entendi. Digite *menu*, *pagar*, *saldo* ou *cadastro*."
-      : menuInicial()
+    message: "Não entendi. Digite *menu*, *pagar*, *saldo* ou *cadastro*."
   });
 }

@@ -25,11 +25,21 @@ function isPrivateOrLocalHost(url: string) {
   return /localhost|127\.0\.0\.1|192\.168\.|10\.\d+\.|172\.(1[6-9]|2\d|3[01])\./i.test(url);
 }
 
+/** Domínio público fixo em produção (links de cobrança e WhatsApp). */
+const PRODUCTION_APP_URL = "https://crediarioms.com";
+
 export function getPublicAppUrl() {
   const explicit = sanitizePublicUrl(process.env.NEXT_PUBLIC_APP_URL ?? "");
-  const vercelHost = process.env.VERCEL_URL?.trim().replace(/^https?:\/\//, "");
 
-  if (process.env.NODE_ENV === "production" && vercelHost) {
+  if (process.env.NODE_ENV === "production") {
+    if (explicit && !isPrivateOrLocalHost(explicit)) {
+      return explicit;
+    }
+    return PRODUCTION_APP_URL;
+  }
+
+  const vercelHost = process.env.VERCEL_URL?.trim().replace(/^https?:\/\//, "");
+  if (vercelHost) {
     const fromVercel = `https://${vercelHost}`;
     if (!explicit || isPrivateOrLocalHost(explicit)) {
       return fromVercel;

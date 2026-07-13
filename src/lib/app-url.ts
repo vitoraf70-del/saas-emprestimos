@@ -30,8 +30,9 @@ const PRODUCTION_APP_URL = "https://crediarioms.com";
 
 export function getPublicAppUrl() {
   const explicit = sanitizePublicUrl(process.env.NEXT_PUBLIC_APP_URL ?? "");
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProduction) {
     if (explicit && !isPrivateOrLocalHost(explicit)) {
       return explicit;
     }
@@ -49,7 +50,7 @@ export function getPublicAppUrl() {
   const raw = explicit || "http://localhost:3000";
   const isLocalhost = /localhost|127\.0\.0\.1/i.test(raw);
 
-  if (isLocalhost && process.env.NODE_ENV !== "production") {
+  if (isLocalhost) {
     const lan = process.env.APP_URL_LAN_HOST?.trim() || detectLanHost();
     const port = raw.match(/:(\d+)/)?.[1] ?? process.env.PORT ?? "3000";
     if (lan) {

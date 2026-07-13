@@ -4,7 +4,7 @@ import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { labelOcupacao, mensagemMenuOcupacao, parseOcupacaoResposta } from "@/lib/ocupacao";
 import { formatBrazilPhone, toCurrency } from "@/lib/utils";
 import { isAiEnabled } from "@/lib/services/ai-chat";
-import { sendWhatsAppMessage, normalizeWhatsAppDigits } from "@/lib/services/whatsapp";
+import { sendWhatsAppMessage, normalizeWhatsAppDigits, whatsappMatchKey } from "@/lib/services/whatsapp";
 import {
   avisarInadimplenteSeNecessario,
   ETAPA_IA,
@@ -44,7 +44,7 @@ function parseDados(raw: Prisma.JsonValue): CadastroDados {
 }
 
 async function findClienteByTelefone(telefone: string) {
-  const alvo = normalizeWhatsAppDigits(telefone);
+  const alvo = whatsappMatchKey(telefone);
   const clientes = await prisma.cliente.findMany({
     select: {
       id: true,
@@ -72,7 +72,7 @@ async function findClienteByTelefone(telefone: string) {
   return (
     clientes.find((c) => {
       try {
-        return normalizeWhatsAppDigits(c.whatsapp) === alvo;
+        return whatsappMatchKey(c.whatsapp) === alvo;
       } catch {
         return false;
       }
@@ -274,20 +274,24 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
   }
 
   const conversa = await prisma.whatsappConversa.findUnique({ where: { telefone } });
+  const cliente = await findClienteByTelefone(telefone);
+
+  // Cliente já cadastrado: dono atende — bot NÃO responde (nem IA, nem menu).
+  if (cliente) {
+    // Para conversa de pré-análise IA se tinha começado por engano
+    if (conversa?.etapa === ETAPA_IA) {
+      await prisma.whatsappConversa.delete({ where: { telefone } }).catch(() => {});
+    }
+    await avisarInadimplenteSeNecessario(telefone, cliente);
+    return;
+  }
+
   const emCadastroManual =
     conversa && conversa.etapa !== "concluido" && conversa.etapa !== ETAPA_IA && conversa.etapa !== "cliente";
 
   if (emCadastroManual) {
     const resposta = await fluxoCadastro(conversa, texto);
     await sendWhatsAppMessage({ phone: telefone, message: resposta });
-    return;
-  }
-
-  const cliente = await findClienteByTelefone(telefone);
-
-  // Cliente já cadastrado: o dono atende manualmente — bot NÃO responde nada.
-  if (cliente) {
-    await avisarInadimplenteSeNecessario(telefone, cliente);
     return;
   }
 

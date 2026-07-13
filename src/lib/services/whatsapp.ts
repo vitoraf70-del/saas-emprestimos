@@ -81,6 +81,19 @@ export function normalizeWhatsAppDigits(phone: string) {
   return `55${digits}`;
 }
 
+/**
+ * Chave de comparação BR: ignora o 9º dígito mobile após o DDD
+ * (ex.: 5567982115296 e 556782115296 batem).
+ */
+export function whatsappMatchKey(phone: string) {
+  let d = normalizeWhatsAppDigits(phone);
+  // 55 + DDD(2) + 9 + 8 dígitos = 13
+  if (d.length === 13 && d[4] === "9") {
+    return d.slice(0, 4) + d.slice(5);
+  }
+  return d;
+}
+
 function normalizePhone(phone: string) {
   return normalizeWhatsAppDigits(phone);
 }

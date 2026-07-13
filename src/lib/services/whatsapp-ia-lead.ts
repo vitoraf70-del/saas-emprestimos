@@ -26,6 +26,10 @@ type DadosIa = {
   lead_qualificado?: boolean;
   lead_notificado?: boolean;
   inadimplente_notificado_em?: string;
+  /** Dono digitou no chat — IA para de responder neste número. */
+  humano_assumiu?: boolean;
+  ultima_resposta_bot?: string;
+  ultima_resposta_bot_em?: string;
 };
 
 function parseDadosIa(raw: Prisma.JsonValue): DadosIa {
@@ -37,12 +41,57 @@ function trimHistorico(historico: AiMessage[]) {
   return historico.slice(-MAX_HISTORICO);
 }
 
-async function salvarConversaIa(telefone: string, dados: DadosIa) {
+function normMsg(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+/** Echo do próprio bot via Evolution (fromMe) — não pausar a IA. */
+function isEchoDoBot(dados: DadosIa, texto: string) {
+  const ultima = dados.ultima_resposta_bot;
+  if (!ultima) return false;
+  const enviadoEm = dados.ultima_resposta_bot_em
+    ? new Date(dados.ultima_resposta_bot_em).getTime()
+    : 0;
+  if (Date.now() - enviadoEm > 120_000) return false;
+  const a = normMsg(texto);
+  const b = normMsg(ultima);
+  return a === b || (a.length > 20 && (b.startsWith(a) || a.startsWith(b.slice(0, 40))));
+}
+
+async function salvarConversaIa(telefone: string, dados: DadosIa, etapa = ETAPA_IA) {
   await prisma.whatsappConversa.upsert({
     where: { telefone },
-    create: { telefone, etapa: ETAPA_IA, dados },
-    update: { etapa: ETAPA_IA, dados }
+    create: { telefone, etapa, dados },
+    update: { etapa, dados }
   });
+}
+
+/**
+ * Dono escreveu no WhatsApp: assume o chat e a IA para de responder.
+ * Ignora eco das mensagens que a própria IA acabou de enviar.
+ */
+export async function assumirConversaPorHumano(telefone: string, texto: string) {
+  const conversa = await prisma.whatsappConversa.findUnique({ where: { telefone } });
+  const dados = parseDadosIa(conversa?.dados ?? {});
+  if (isEchoDoBot(dados, texto)) return false;
+
+  await prisma.whatsappConversa.upsert({
+    where: { telefone },
+    create: {
+      telefone,
+      etapa: "humano",
+      dados: { ...dados, humano_assumiu: true }
+    },
+    update: {
+      etapa: "humano",
+      dados: { ...dados, humano_assumiu: true }
+    }
+  });
+  return true;
+}
+
+export function conversaAssumidaPorHumano(dados: DadosIa, etapa?: string) {
+  return dados.humano_assumiu === true || etapa === "humano";
 }
 
 function mapearOcupacao(texto?: string): { tipo: TipoOcupacao; detalhe?: string } {
@@ -65,12 +114,13 @@ export async function processarLeadComIA(
   const conversa = await prisma.whatsappConversa.findUnique({ where: { telefone } });
   const dados = parseDadosIa(conversa?.dados ?? {});
 
+  // Dono já assumiu o chat — silêncio total.
+  if (conversaAssumidaPorHumano(dados, conversa?.etapa)) {
+    return true;
+  }
+
+  // Já qualificado: uma confirmação basta; não fica repetindo.
   if (dados.lead_qualificado) {
-    await sendWhatsAppMessage({
-      phone: telefone,
-      message:
-        "Seu cadastro já foi encaminhado para análise. Em breve entraremos em contato!\n\nDigite *menu* se precisar."
-    });
     return true;
   }
 
@@ -119,12 +169,15 @@ export async function processarLeadComIA(
     ].join("\n");
   }
 
+  const agora = new Date().toISOString();
   await salvarConversaIa(telefone, {
     lead,
     historico: trimHistorico(historico),
     quer_credito: querCredito,
     lead_qualificado: leadQualificado || dados.lead_qualificado,
-    lead_notificado: leadNotificado
+    lead_notificado: leadNotificado,
+    ultima_resposta_bot: respostaCliente,
+    ultima_resposta_bot_em: agora
   });
 
   await sendWhatsAppMessage({ phone: telefone, message: respostaCliente });

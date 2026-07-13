@@ -6,11 +6,18 @@ import { formatBrazilPhone, toCurrency } from "@/lib/utils";
 import { isAiEnabled } from "@/lib/services/ai-chat";
 import { sendWhatsAppMessage, normalizeWhatsAppDigits, whatsappMatchKey } from "@/lib/services/whatsapp";
 import {
+  assumirConversaPorHumano,
   avisarInadimplenteSeNecessario,
+  conversaAssumidaPorHumano,
   ETAPA_IA,
   processarLeadComIA
 } from "@/lib/services/whatsapp-ia-lead";
 import type { InboundWhatsAppMessage } from "@/lib/services/whatsapp-inbound";
+
+function parseDadosConversa(raw: Prisma.JsonValue) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as { humano_assumiu?: boolean; lead_qualificado?: boolean };
+}
 
 type CadastroDados = {
   nome?: string;
@@ -258,10 +265,15 @@ function menuInicial() {
 }
 
 export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
-  if (msg.fromMe) return;
-
   const telefone = normalizeWhatsAppDigits(msg.telefone);
   const texto = msg.texto.trim();
+
+  // Você digitou no chat → IA para neste número (só você responde).
+  if (msg.fromMe) {
+    await assumirConversaPorHumano(telefone, texto);
+    return;
+  }
+
   const cmd = texto.toLowerCase();
 
   if (cmd === "cancelar") {
@@ -274,11 +286,16 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
   }
 
   const conversa = await prisma.whatsappConversa.findUnique({ where: { telefone } });
+  const dados = parseDadosConversa(conversa?.dados ?? {});
+
+  if (conversaAssumidaPorHumano(dados, conversa?.etapa)) {
+    return;
+  }
+
   const cliente = await findClienteByTelefone(telefone);
 
   // Cliente já cadastrado: dono atende — bot NÃO responde (nem IA, nem menu).
   if (cliente) {
-    // Para conversa de pré-análise IA se tinha começado por engano
     if (conversa?.etapa === ETAPA_IA) {
       await prisma.whatsappConversa.delete({ where: { telefone } }).catch(() => {});
     }

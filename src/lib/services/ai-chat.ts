@@ -23,7 +23,17 @@ export type AiLeadResult = {
   encerrar: boolean;
 };
 
+/** Kill switch: WHATSAPP_IA_ENABLED=false pausa o bot (IA + cadastro automático). */
+export function isWhatsAppBotEnabled() {
+  const flag = process.env.WHATSAPP_IA_ENABLED?.trim().toLowerCase();
+  if (flag === "false" || flag === "0" || flag === "off" || flag === "pause") {
+    return false;
+  }
+  return true;
+}
+
 export function isAiEnabled() {
+  if (!isWhatsAppBotEnabled()) return false;
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 

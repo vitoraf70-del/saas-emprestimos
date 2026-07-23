@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { labelOcupacao, mensagemMenuOcupacao, parseOcupacaoResposta } from "@/lib/ocupacao";
 import { formatBrazilPhone, toCurrency } from "@/lib/utils";
-import { isAiEnabled } from "@/lib/services/ai-chat";
+import { isAiEnabled, isWhatsAppBotEnabled } from "@/lib/services/ai-chat";
 import { sendWhatsAppMessage, normalizeWhatsAppDigits, whatsappMatchKey } from "@/lib/services/whatsapp";
 import {
   assumirConversaPorHumano,
@@ -271,6 +271,11 @@ export async function processarMensagemWhatsApp(msg: InboundWhatsAppMessage) {
   // Você digitou no chat → IA para neste número (só você responde).
   if (msg.fromMe) {
     await assumirConversaPorHumano(telefone, texto);
+    return;
+  }
+
+  // Bot pausado — não responde ninguém (cobrança automática continua no cron).
+  if (!isWhatsAppBotEnabled()) {
     return;
   }
 

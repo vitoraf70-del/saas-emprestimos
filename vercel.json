@@ -5,6 +5,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/whatsapp-health",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/cobrancas",
       "schedule": "0 18 * * *"
     },

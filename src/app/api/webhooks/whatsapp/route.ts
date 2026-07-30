@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { processarMensagemWhatsApp } from "@/lib/services/whatsapp-atendimento";
 import { parseInboundWhatsApp } from "@/lib/services/whatsapp-inbound";
+import {
+  parseEvolutionConnectionEvent,
+  verificarSaudeWhatsApp
+} from "@/lib/services/whatsapp-health";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,6 +30,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
 
+  const connectionState = parseEvolutionConnectionEvent(body);
+  if (connectionState) {
+    const health = await verificarSaudeWhatsApp({
+      forceAlert: connectionState === "close",
+      stateOverride: connectionState
+    });
+    return NextResponse.json({ ok: true, connection: health });
+  }
+
   const provider = process.env.WHATSAPP_PROVIDER ?? "evolution";
   const inbound = parseInboundWhatsApp(body, provider);
   if (!inbound) {
@@ -45,6 +58,6 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     provider: process.env.WHATSAPP_PROVIDER ?? "evolution",
-    hint: "Configure POST com mensagens recebidas (Evolution messages.upsert ou Z-API ReceivedCallback)."
+    hint: "POST: messages.upsert + connection.update (Evolution)."
   });
 }

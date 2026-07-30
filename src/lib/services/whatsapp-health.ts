@@ -160,9 +160,9 @@ export async function verificarSaudeWhatsApp(options?: {
   stateOverride?: EvolutionState;
 }) {
   const agora = new Date();
-  const checked = await (options?.stateOverride
-    ? Promise.resolve({ state: options.stateOverride as EvolutionState })
-    : getEvolutionConnectionState());
+  const checked = options?.stateOverride
+    ? { state: options.stateOverride, error: undefined as string | undefined }
+    : await getEvolutionConnectionState();
 
   const monitor = await loadMonitor();
   const prev = monitor.state ?? "unknown";
@@ -201,10 +201,7 @@ export async function verificarSaudeWhatsApp(options?: {
     };
   }
 
-  const channels = await sendDisconnectAlert(
-    state,
-    "error" in checked ? checked.error : undefined
-  );
+  const channels = await sendDisconnectAlert(state, checked.error);
 
   await saveMonitor({
     state,

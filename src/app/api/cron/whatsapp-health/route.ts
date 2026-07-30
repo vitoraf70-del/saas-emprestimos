@@ -19,5 +19,5 @@ export async function GET(request: Request) {
   }
 
   const result = await verificarSaudeWhatsApp();
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json(result);
 }

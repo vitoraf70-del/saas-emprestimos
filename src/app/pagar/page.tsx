@@ -31,7 +31,6 @@ export default async function PagarPage({
           emprestimos: {
             include: {
               parcelas: {
-                where: { status: { in: ["pendente", "vencida"] } },
                 orderBy: { vencimento: "asc" }
               }
             }
@@ -40,8 +39,12 @@ export default async function PagarPage({
       })
     : null;
 
-  const parcelas = (cliente?.emprestimos ?? [])
-    .flatMap((e) => e.parcelas.map((p) => ({ parcela: p, emprestimo: e })))
+  const todasParcelas = (cliente?.emprestimos ?? []).flatMap((e) =>
+    e.parcelas.map((p) => ({ parcela: p, emprestimo: e }))
+  );
+  const parcelasPagas = todasParcelas.filter(({ parcela }) => parcela.status === "paga");
+  const parcelas = todasParcelas
+    .filter(({ parcela }) => parcela.status === "pendente" || parcela.status === "vencida")
     .map(({ parcela: p, emprestimo: e }) => {
       const atraso = diasAtraso(new Date(p.vencimento), new Date());
       const calc = calcularParcelaComIsencao(
@@ -63,7 +66,7 @@ export default async function PagarPage({
       <div className="rounded-2xl border border-white/10 bg-white/95 p-5 shadow-2xl shadow-black/30">
       <h1 className="mb-2 text-xl font-semibold text-foreground">Pagar parcela</h1>
       <p className="mb-4 text-sm text-muted-foreground">
-        Digite seu CPF para ver todas as parcelas pendentes.
+        Digite seu CPF para ver as parcelas pagas e as pendentes.
       </p>
 
       <CpfSearchForm initialCpf={cpf} />
@@ -81,6 +84,16 @@ export default async function PagarPage({
           <div className="rounded-lg border p-3">
             <p className="text-sm font-semibold">{cliente.nome}</p>
             <p className="text-xs text-muted-foreground">CPF: {cliente.cpf}</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+              <p>
+                <span className="block text-xs text-muted-foreground">Parcelas pagas</span>
+                <span className="font-semibold text-emerald-700">{parcelasPagas.length}</span>
+              </p>
+              <p>
+                <span className="block text-xs text-muted-foreground">Em aberto</span>
+                <span className="font-semibold">{parcelas.length}</span>
+              </p>
+            </div>
           </div>
           {parcelas.length > 0 ? (
             <div className="rounded-lg border p-3 text-sm">
@@ -93,7 +106,12 @@ export default async function PagarPage({
           ) : null}
 
           {parcelas.length === 0 ? (
-            <p className="rounded-lg border p-3 text-sm">Você não possui parcelas pendentes no momento.</p>
+            <p className="rounded-lg border p-3 text-sm">
+              Você não possui parcelas pendentes no momento.
+              {parcelasPagas.length > 0
+                ? ` ${parcelasPagas.length} parcela(s) já ${parcelasPagas.length === 1 ? "foi paga" : "foram pagas"}.`
+                : ""}
+            </p>
           ) : (
             parcelas.map(({ parcela, calc }) => (
               <article key={parcela.id} className="rounded-lg border p-3 shadow-sm">
@@ -111,6 +129,28 @@ export default async function PagarPage({
               </article>
             ))
           )}
+
+          {parcelasPagas.length > 0 ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                {parcelasPagas.length} parcela(s) já paga(s)
+              </p>
+              {parcelasPagas.map(({ parcela }) => (
+                <article
+                  key={parcela.id}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3"
+                >
+                  <p className="text-sm font-medium text-emerald-800">
+                    Parcela {parcela.numero_parcela} · Paga
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Vencimento: {formatDateBR(new Date(parcela.vencimento))} ·{" "}
+                    {toCurrency(Number(parcela.valor_original))}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
       </div>

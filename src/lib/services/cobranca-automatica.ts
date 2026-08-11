@@ -17,7 +17,7 @@ import { sendWhatsAppMessage } from "@/lib/services/whatsapp";
 import { buildPagarLink, formatLinkPagamentoWhatsApp } from "@/lib/app-url";
 import { toCurrency } from "@/lib/utils";
 
-const MAX_AVISOS_VENCIMENTO = 4;
+const MAX_AVISOS_VENCIMENTO = 2;
 const VENCIMENTO_JANELA_DIAS_ANTES = 5;
 const VENCIMENTO_JANELA_DIAS_ATRASO = 120;
 
@@ -56,8 +56,8 @@ type SendJob = {
 };
 
 function getConcurrency() {
-  const raw = Number(process.env.COBRANCA_CONCURRENCY ?? "12");
-  return Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 20) : 12;
+  const raw = Number(process.env.COBRANCA_CONCURRENCY ?? "4");
+  return Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(raw), 8) : 4;
 }
 
 function getDeadlineMs(override?: number) {
@@ -109,13 +109,11 @@ function isJanelaAntecipado(hoje: Date) {
   return getCampoGrandeClock(hoje).hour === 19;
 }
 
-/** Índice da janela de cobrança do dia: 14h=0, 17h=1, 20h=2, 23h40=3. null fora delas. */
+/** Índice da janela de vencimento: 17h=0, 23h40=1. null fora delas. */
 function avisoWindowIndex(hoje: Date): number | null {
   const { hour, minute } = getCampoGrandeClock(hoje);
-  if (hour === 14) return 0;
-  if (hour === 17) return 1;
-  if (hour === 20) return 2;
-  if (hour === 23 && minute >= 35) return 3;
+  if (hour === 17) return 0;
+  if (hour === 23 && minute >= 35) return 1;
   return null;
 }
 
@@ -128,46 +126,23 @@ function detectarFase(
   hoje: Date,
   frequenciaParcela: FrequenciaParcela
 ): { fase: FaseCobranca | null; motivo?: string } {
+  // Volume alto derruba o WhatsApp: atrasados não recebem mais aviso automático.
   if (diasAtrasoValor > 0) {
-    const janela = avisoWindowIndex(hoje);
-    if (janela === null) {
-      return { fase: null, motivo: "atraso: fora do horário (14:00, 17:00, 20:00 ou 23:40)" };
-    }
-    if (
-      ultimoAviso &&
-      isSameCalendarDayBR(ultimoAviso, hoje) &&
-      avisoWindowIndex(ultimoAviso) === janela
-    ) {
-      return { fase: null, motivo: "atraso: já avisado nesta janela" };
-    }
-    return { fase: "atraso" };
+    return { fase: null, motivo: "atraso: aviso automático desligado (só vence hoje e vence amanhã)" };
   }
 
   if (isDomingo(hoje)) {
-    return { fase: null, motivo: "domingo: cobrança só em atraso (multa/juros continuam)" };
-  }
-
-  if (diasParaVencerValor === 2 || diasParaVencerValor === 1) {
-    if (frequenciaParcela === "diario") {
-      return { fase: null, motivo: "diário: sem aviso antecipado (só no dia do vencimento)" };
-    }
-  }
-
-  if (diasParaVencerValor === 2) {
-    if (!isJanelaAntecipado(hoje)) {
-      return { fase: null, motivo: "antecipado 2d: fora do horário (19:00)" };
-    }
-    if (avisosAntecipados >= 1) {
-      return { fase: null, motivo: "antecipado 2d: lembrete já enviado" };
-    }
-    return { fase: "antecipado" };
+    return { fase: null, motivo: "domingo: sem cobrança WhatsApp (multa/juros continuam)" };
   }
 
   if (diasParaVencerValor === 1) {
+    if (frequenciaParcela === "diario") {
+      return { fase: null, motivo: "diário: sem aviso antecipado (só no dia do vencimento)" };
+    }
     if (!isJanelaAntecipado(hoje)) {
       return { fase: null, motivo: "antecipado 1d: fora do horário (19:00)" };
     }
-    if (avisosAntecipados >= 2) {
+    if (avisosAntecipados >= 1) {
       return { fase: null, motivo: "antecipado 1d: lembrete já enviado" };
     }
     return { fase: "antecipado" };
@@ -176,7 +151,7 @@ function detectarFase(
   if (diasParaVencerValor === 0) {
     const janela = avisoWindowIndex(hoje);
     if (janela === null) {
-      return { fase: null, motivo: "vencimento: fora do horário (14:00, 17:00, 20:00 ou 23:40)" };
+      return { fase: null, motivo: "vencimento: fora do horário (17:00 ou 23:40)" };
     }
     if (
       ultimoAviso &&
@@ -212,11 +187,7 @@ function montarMensagem(input: {
   const rodape = formatLinkPagamentoWhatsApp(linkPagamento);
 
   if (fase === "antecipado") {
-    const prazo =
-      input.diasParaVencerValor === 1
-        ? `vence amanhã (${dataVenc})`
-        : `vence em 2 dias (${dataVenc})`;
-    return `Olá ${nome}! Lembrete: sua parcela ${numeroParcela} ${prazo}. Valor: ${valor}.${rodape}`;
+    return `Olá ${nome}! Lembrete: sua parcela ${numeroParcela} vence amanhã (${dataVenc}). Valor: ${valor}.${rodape}`;
   }
 
   if (fase === "vencimento") {
@@ -267,9 +238,9 @@ function buildSendJob(
   let maxAvisos = 1;
 
   if (fase === "antecipado") {
-    updateCounters.avisos_antecipados = diasParaVencerValor === 2 ? 1 : 2;
-    avisoNumero = updateCounters.avisos_antecipados;
-    maxAvisos = 2;
+    updateCounters.avisos_antecipados = 1;
+    avisoNumero = 1;
+    maxAvisos = 1;
   } else if (fase === "vencimento") {
     avisoNumero = parcela.avisos_vencimento + 1;
     maxAvisos = MAX_AVISOS_VENCIMENTO;

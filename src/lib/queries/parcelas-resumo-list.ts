@@ -30,6 +30,7 @@ export type ParcelasResumoRow = {
   emAberto: number;
   proximoVencimento: Date | null;
   situacao: "vencida" | "pendente" | "em_dia" | "quitado";
+  cobrancaMarcada: boolean;
   parcelasAbertas: ParcelaAbertaRow[];
 };
 
@@ -141,6 +142,7 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
         id: true,
         numero_parcelas: true,
         cliente_id: true,
+        cobranca_marcada_em: true,
         cliente: { select: { nome: true } }
       }
     }),
@@ -216,7 +218,8 @@ export async function getParcelasResumoList(filters: ParcelasResumoFilters = {})
       parcelasVencidas: stats.vencidas,
       emAberto: stats.emAberto,
       proximoVencimento: proximoPorEmprestimo.get(e.id) ?? null,
-      situacao: situacaoFromStats(stats.pagas, e.numero_parcelas, stats.vencidas)
+      situacao: situacaoFromStats(stats.pagas, e.numero_parcelas, stats.vencidas),
+      cobrancaMarcada: Boolean(e.cobranca_marcada_em)
     };
   });
 

@@ -49,6 +49,49 @@ type BaixaTarget = {
   parcelasAbertas: ParcelaAbertaRow[];
 };
 
+function CobrancaCheck({ emprestimoId, marcada }: { emprestimoId: string; marcada: boolean }) {
+  const [checked, setChecked] = useState(marcada);
+  const [saving, setSaving] = useState(false);
+
+  async function onChange(next: boolean) {
+    const previous = checked;
+    setChecked(next);
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/emprestimos/${emprestimoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cobrancaMarcada: next })
+      });
+      if (!response.ok) {
+        setChecked(previous);
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        window.alert(body?.error ?? "Não foi possível salvar a cobrança.");
+      }
+    } catch {
+      setChecked(previous);
+      window.alert("Não foi possível salvar a cobrança.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={saving}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 accent-primary"
+      />
+      <span className={checked ? "text-emerald-700" : "text-muted-foreground"}>
+        {checked ? "Cobrada" : "Cobrar"}
+      </span>
+    </label>
+  );
+}
+
 type Props = {
   rows: ParcelasResumoRow[];
   total: number;
@@ -105,13 +148,14 @@ export function ParcelasListClient({ rows, total, currentPage, totalPages, filte
                 <th className="p-3">Em aberto</th>
                 <th className="p-3">Próx. vencimento</th>
                 <th className="p-3">Situação</th>
+                <th className="p-3">Cobrança</th>
                 <th className="p-3">Ação</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
                     Nenhum empréstimo encontrado com os filtros informados.
                   </td>
                 </tr>
@@ -140,6 +184,9 @@ export function ParcelasListClient({ rows, total, currentPage, totalPages, filte
                     </td>
                     <td className={`p-3 ${situacaoClass[row.situacao] ?? ""}`}>
                       {labelSituacaoParcelas(row.situacao)}
+                    </td>
+                    <td className="p-3">
+                      <CobrancaCheck emprestimoId={row.emprestimoId} marcada={row.cobrancaMarcada} />
                     </td>
                     <td className="p-3">
                       {row.parcelasAbertas.length > 0 ? (

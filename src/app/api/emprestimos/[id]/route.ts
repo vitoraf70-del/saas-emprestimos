@@ -54,6 +54,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   try {
     const body = await request.json();
+
+    if (typeof body.cobrancaMarcada === "boolean") {
+      await prisma.emprestimo.update({
+        where: { id: params.id },
+        data: { cobranca_marcada_em: body.cobrancaMarcada ? new Date() : null }
+      });
+      revalidatePath("/parcelas");
+      return NextResponse.json({ ok: true, cobrancaMarcada: body.cobrancaMarcada });
+    }
+
     const valorEmprestado =
       body.valorEmprestado != null ? Number(body.valorEmprestado) : undefined;
     const valorParcela = body.valorParcela != null ? Number(body.valorParcela) : undefined;

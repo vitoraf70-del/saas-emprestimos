@@ -185,6 +185,7 @@ model Emprestimo {
   juros_dia_percentual  Decimal          @default(0.33) @db.Decimal(5, 2)
   status                StatusEmprestimo @default(ativo)
   frequencia_parcela    FrequenciaParcela @default(semanal)
+  cobranca_marcada_em   DateTime?
   created_at            DateTime         @default(now())
   cliente               Cliente          @relation(fields: [cliente_id], references: [id], onDelete: Restrict)
   parcelas              Parcela[]

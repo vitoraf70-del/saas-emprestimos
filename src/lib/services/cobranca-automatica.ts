@@ -109,6 +109,10 @@ function isJanelaAntecipado(hoje: Date) {
   return getCampoGrandeClock(hoje).hour === 19;
 }
 
+function isJanelaAtraso(hoje: Date) {
+  return getCampoGrandeClock(hoje).hour === 17;
+}
+
 /** Índice da janela de vencimento: 17h=0, 23h40=1. null fora delas. */
 function avisoWindowIndex(hoje: Date): number | null {
   const { hour, minute } = getCampoGrandeClock(hoje);
@@ -126,9 +130,14 @@ function detectarFase(
   hoje: Date,
   frequenciaParcela: FrequenciaParcela
 ): { fase: FaseCobranca | null; motivo?: string } {
-  // Volume alto derruba o WhatsApp: atrasados não recebem mais aviso automático.
   if (diasAtrasoValor > 0) {
-    return { fase: null, motivo: "atraso: aviso automático desligado (só vence hoje e vence amanhã)" };
+    if (!isJanelaAtraso(hoje)) {
+      return { fase: null, motivo: "atraso: só um aviso por dia (17:00)" };
+    }
+    if (ultimoAviso && isSameCalendarDayBR(ultimoAviso, hoje)) {
+      return { fase: null, motivo: "atraso: já avisado hoje" };
+    }
+    return { fase: "atraso" };
   }
 
   if (isDomingo(hoje)) {
